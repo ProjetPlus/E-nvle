@@ -64,6 +64,61 @@
     --sidebar-border: 218 20% 17%;
     --sidebar-ring: 142 47% 33%;
   }
+
+  /* Light mode */
+  .light {
+    --background: 40 30% 97%;
+    --foreground: 220 20% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 12%;
+
+    --primary: 142 47% 33%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 142 47% 40%;
+    --primary-dark: 142 47% 25%;
+
+    --secondary: 37 90% 50%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 14% 92%;
+    --muted-foreground: 220 10% 45%;
+
+    --accent: 220 14% 92%;
+    --accent-foreground: 220 20% 12%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 14% 85%;
+    --input: 220 14% 85%;
+    --ring: 142 47% 33%;
+
+    --envle-noir: 0 0% 97%;
+    --envle-fond: 40 20% 96%;
+    --envle-card: 0 0% 100%;
+    --envle-border: 220 14% 88%;
+    --envle-text-muted: 220 10% 50%;
+    --envle-vert: 142 47% 33%;
+    --envle-vert-light: 142 47% 28%;
+    --envle-vert-dark: 142 47% 23%;
+    --envle-or: 37 90% 45%;
+    --envle-or-light: 37 90% 55%;
+    --envle-rouge: 0 75% 50%;
+    --envle-bleu: 217 91% 50%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 220 20% 12%;
+    --sidebar-primary: 142 47% 33%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 92%;
+    --sidebar-accent-foreground: 220 20% 12%;
+    --sidebar-border: 220 14% 88%;
+    --sidebar-ring: 142 47% 33%;
+  }
 }
 
 @layer base {
@@ -122,4 +177,8 @@
 @keyframes call-pulse {
   0%, 100% { box-shadow: 0 0 0 8px hsla(271, 81%, 56%, 0.1), 0 0 0 16px hsla(271, 81%, 56%, 0.05); }
   50% { box-shadow: 0 0 0 12px hsla(271, 81%, 56%, 0.15), 0 0 0 24px hsla(271, 81%, 56%, 0.08); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
