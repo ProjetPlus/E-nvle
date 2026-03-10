@@ -1,12 +1,15 @@
 import { toast } from "sonner";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "@/hooks/use-theme";
+import envleLogo from "@/assets/envle-logo.jpg";
 
 interface SidebarProps {
   activeNav: string;
   onNavChange: (nav: string) => void;
   onOpenAuth: () => void;
   onOpenCall: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 const navItems = [
@@ -19,26 +22,23 @@ const navItems = [
   { id: "map", icon: "🗺️", label: "Carte & Localisation" },
 ];
 
-const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall }: SidebarProps) => {
+const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall, isOpen, onClose }: SidebarProps) => {
   const { theme, toggleTheme } = useTheme();
 
   const handleNav = (id: string, label: string) => {
     onNavChange(id);
-    if (!["chat", "stories", "community", "shop"].includes(id)) {
-      toast(`${label} — Module en développement`);
-    }
+    onClose?.();
   };
 
-  return (
-    <nav className="w-[72px] bg-envle-noir border-r border-envle-border flex flex-col items-center py-5 gap-2 z-[100] max-md:hidden">
+  const sidebarContent = (
+    <nav className="w-[72px] bg-envle-noir border-r border-envle-border flex flex-col items-center py-5 gap-2 z-[100] h-full">
       <motion.div
-        whileHover={{ scale: 1.08, rotate: 5 }}
+        whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.95 }}
-        className="w-11 h-11 rounded-[14px] flex items-center justify-center text-[22px] mb-4 cursor-pointer"
-        style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-or)))" }}
+        className="w-11 h-11 rounded-[14px] overflow-hidden mb-4 cursor-pointer"
         onClick={() => toast("🌍 E'nvlé — Super App Africaine")}
       >
-        🪶
+        <img src={envleLogo} alt="E'nvlé" className="w-full h-full object-cover" />
       </motion.div>
 
       <div className="w-10 h-px bg-envle-border my-2" />
@@ -83,7 +83,6 @@ const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall }: SidebarProp
 
       <div className="flex-1" />
 
-      {/* Theme toggle */}
       <motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.9, rotate: 180 }}
@@ -113,6 +112,37 @@ const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall }: SidebarProp
         KD
       </motion.div>
     </nav>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <div className="max-md:hidden">{sidebarContent}</div>
+
+      {/* Mobile sidebar overlay */}
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm md:hidden"
+              onClick={onClose}
+            />
+            <motion.div
+              initial={{ x: -80 }}
+              animate={{ x: 0 }}
+              exit={{ x: -80 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="fixed left-0 top-0 bottom-0 z-[151] md:hidden"
+            >
+              {sidebarContent}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 

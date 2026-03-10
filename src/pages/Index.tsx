@@ -2,7 +2,6 @@ import { useState, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import SplashScreen from "@/components/envle/SplashScreen";
 import Sidebar from "@/components/envle/Sidebar";
-import MobileNav from "@/components/envle/MobileNav";
 import ConversationPanel from "@/components/envle/ConversationPanel";
 import type { Conversation } from "@/components/envle/ConversationPanel";
 import ChatArea from "@/components/envle/ChatArea";
@@ -12,7 +11,17 @@ import CallModal from "@/components/envle/CallModal";
 import StoriesModule from "@/components/envle/StoriesModule";
 import BoutiqueModule from "@/components/envle/BoutiqueModule";
 import CommunityModule from "@/components/envle/CommunityModule";
+import CallsModule from "@/components/envle/CallsModule";
+import JobsModule from "@/components/envle/JobsModule";
+import MapModule from "@/components/envle/MapModule";
 import { useIsMobile } from "@/hooks/use-mobile";
+
+const pageTransition = {
+  initial: { opacity: 0, x: 30 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -30 },
+  transition: { duration: 0.25, ease: "easeInOut" as const },
+};
 
 const defaultConv: Conversation = {
   id: "1",
@@ -35,6 +44,7 @@ const Index = () => {
   const [callOpen, setCallOpen] = useState(false);
   const [callType, setCallType] = useState("video");
   const [mobileView, setMobileView] = useState<"list" | "chat">("list");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
 
   const handleSplashFinish = useCallback(() => {
@@ -58,35 +68,31 @@ const Index = () => {
   }, []);
 
   const renderMainContent = () => {
-    switch (activeNav) {
-      case "stories":
-        return <StoriesModule onBack={() => setActiveNav("chat")} />;
-      case "shop":
-        return <BoutiqueModule onBack={() => setActiveNav("chat")} />;
-      case "community":
-        return <CommunityModule onBack={() => setActiveNav("chat")} />;
-      default:
-        return (
-          <>
-            {/* Conversation list - hidden on mobile when viewing chat */}
-            <div className={`${isMobile && mobileView === "chat" ? "hidden" : "flex"} ${isMobile ? "flex-1" : ""}`}>
-              <ConversationPanel
-                activeConvId={activeConv.id}
-                onSelectConv={handleSelectConv}
-              />
-            </div>
-            {/* Chat area - hidden on mobile when viewing list */}
-            <div className={`flex-1 flex ${isMobile && mobileView === "list" ? "hidden" : ""}`}>
-              <ChatArea
-                conv={activeConv}
-                onOpenCall={openCall}
-                onBack={isMobile ? () => setMobileView("list") : undefined}
-              />
-            </div>
-            {!isMobile && <RightPanel conv={activeConv} onOpenCall={openCall} />}
-          </>
-        );
-    }
+    const goChat = () => setActiveNav("chat");
+
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div key={activeNav} {...pageTransition} className="flex-1 flex overflow-hidden">
+          {activeNav === "stories" && <StoriesModule onBack={goChat} />}
+          {activeNav === "shop" && <BoutiqueModule onBack={goChat} />}
+          {activeNav === "community" && <CommunityModule onBack={goChat} />}
+          {activeNav === "calls" && <CallsModule onBack={goChat} />}
+          {activeNav === "jobs" && <JobsModule onBack={goChat} />}
+          {activeNav === "map" && <MapModule onBack={goChat} />}
+          {activeNav === "chat" && (
+            <>
+              <div className={`${isMobile && mobileView === "chat" ? "hidden" : "flex"} ${isMobile ? "flex-1" : ""}`}>
+                <ConversationPanel activeConvId={activeConv.id} onSelectConv={handleSelectConv} />
+              </div>
+              <div className={`flex-1 flex ${isMobile && mobileView === "list" ? "hidden" : ""}`}>
+                <ChatArea conv={activeConv} onOpenCall={openCall} onBack={isMobile ? () => setMobileView("list") : undefined} />
+              </div>
+              {!isMobile && <RightPanel conv={activeConv} onOpenCall={openCall} />}
+            </>
+          )}
+        </motion.div>
+      </AnimatePresence>
+    );
   };
 
   return (
@@ -98,25 +104,29 @@ const Index = () => {
         animate={{ opacity: appVisible ? 1 : 0 }}
         transition={{ duration: 0.5 }}
         className="flex h-screen"
-        style={{ paddingBottom: isMobile ? "64px" : 0 }}
       >
         <Sidebar
           activeNav={activeNav}
           onNavChange={handleNavChange}
           onOpenAuth={() => setAuthOpen(true)}
           onOpenCall={() => openCall()}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
+
+        {/* Mobile hamburger button */}
+        {isMobile && appVisible && (
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            className="fixed top-3 left-3 z-[140] w-10 h-10 rounded-xl bg-envle-card border border-envle-border flex items-center justify-center text-lg cursor-pointer shadow-lg"
+            onClick={() => setSidebarOpen(true)}
+          >
+            ☰
+          </motion.button>
+        )}
+
         {renderMainContent()}
       </motion.div>
-
-      {isMobile && appVisible && (
-        <MobileNav
-          activeNav={activeNav}
-          onNavChange={handleNavChange}
-          onOpenAuth={() => setAuthOpen(true)}
-          onOpenCall={() => openCall()}
-        />
-      )}
 
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
       <CallModal
