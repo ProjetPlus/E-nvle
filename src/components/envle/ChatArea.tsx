@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import type { Conversation } from "./ConversationPanel";
 
@@ -32,9 +33,10 @@ const replies = [
 interface Props {
   conv: Conversation;
   onOpenCall: (type: string) => void;
+  onBack?: () => void;
 }
 
-const ChatArea = ({ conv, onOpenCall }: Props) => {
+const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const areaRef = useRef<HTMLDivElement>(null);
@@ -52,7 +54,6 @@ const ChatArea = ({ conv, onOpenCall }: Props) => {
     setMessages((prev) => [...prev, newMsg]);
     setInput("");
 
-    // Simulate typing & reply
     setTimeout(() => {
       const typingId = `typing-${Date.now()}`;
       setMessages((prev) => [...prev, { id: typingId, text: "", sent: false, time: "", isTyping: true }]);
@@ -86,22 +87,32 @@ const ChatArea = ({ conv, onOpenCall }: Props) => {
       />
 
       {/* Header */}
-      <div className="px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3.5 z-10">
+      <div className="px-4 md:px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3 z-10">
+        {onBack && (
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all"
+            onClick={onBack}
+          >
+            ←
+          </motion.button>
+        )}
         <div
           className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-lg"
           style={{ background: conv.avatarStyle }}
         >
           {conv.avatar}
         </div>
-        <div className="flex-1">
-          <div className="text-base font-bold">{conv.name}</div>
+        <div className="flex-1 min-w-0">
+          <div className="text-base font-bold truncate">{conv.name}</div>
           <div className="text-xs text-green-500">🟢 En ligne</div>
         </div>
-        <div className="flex gap-2">
-          {["📞", "📹", "👥", "📍", "🔍", "⋯"].map((icon, i) => (
-            <button
+        <div className="flex gap-1.5 md:gap-2">
+          {["📞", "📹", "🔍"].map((icon, i) => (
+            <motion.button
               key={i}
-              className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-envle-text-muted text-lg cursor-pointer transition-all flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light"
+              whileTap={{ scale: 0.9 }}
+              className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-foreground/[0.06] border-none text-envle-text-muted text-lg cursor-pointer transition-all flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light"
               onClick={() => {
                 if (icon === "📞") onOpenCall("audio");
                 else if (icon === "📹") onOpenCall("video");
@@ -109,23 +120,25 @@ const ChatArea = ({ conv, onOpenCall }: Props) => {
               }}
             >
               {icon}
-            </button>
+            </motion.button>
           ))}
         </div>
       </div>
 
       {/* Messages */}
-      <div ref={areaRef} className="flex-1 overflow-y-auto px-6 pt-6 pb-2 flex flex-col gap-1 scrollbar-thin z-10">
+      <div ref={areaRef} className="flex-1 overflow-y-auto px-4 md:px-6 pt-6 pb-2 flex flex-col gap-1 scrollbar-thin z-10">
         <div className="text-center text-xs text-envle-text-muted my-4 relative">
           <span className="relative z-10 bg-background px-3">Aujourd'hui</span>
           <div className="absolute top-1/2 left-0 right-0 h-px bg-envle-border" />
         </div>
 
-        {messages.map((msg) => (
-          <div
+        {messages.map((msg, i) => (
+          <motion.div
             key={msg.id}
+            initial={{ opacity: 0, y: 8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.25 }}
             className={`flex mb-0.5 ${msg.sent ? "justify-end" : "justify-start"}`}
-            style={{ animation: "msg-in 0.3s ease" }}
           >
             {msg.isTyping ? (
               <div className="flex items-center gap-2 py-2">
@@ -142,7 +155,7 @@ const ChatArea = ({ conv, onOpenCall }: Props) => {
               </div>
             ) : (
               <div
-                className={`max-w-[65%] px-3.5 py-2.5 rounded-[18px] text-sm leading-relaxed ${
+                className={`max-w-[80%] md:max-w-[65%] px-3.5 py-2.5 rounded-[18px] text-sm leading-relaxed ${
                   msg.sent
                     ? "rounded-br-[6px] text-foreground"
                     : "bg-envle-card border border-envle-border rounded-bl-[6px]"
@@ -161,12 +174,13 @@ const ChatArea = ({ conv, onOpenCall }: Props) => {
                 )}
                 {msg.isVoice ? (
                   <div className="flex items-center gap-2.5 px-3 py-2">
-                    <div
+                    <motion.div
+                      whileTap={{ scale: 0.9 }}
                       className="w-8 h-8 rounded-full bg-foreground/15 flex items-center justify-center text-sm cursor-pointer"
                       onClick={() => toast("🎤 Lecture du message vocal")}
                     >
                       ▶️
-                    </div>
+                    </motion.div>
                     <div className="flex items-center gap-0.5 flex-1">
                       {Array.from({ length: 10 }).map((_, i) => (
                         <div
@@ -190,13 +204,13 @@ const ChatArea = ({ conv, onOpenCall }: Props) => {
                 </div>
               </div>
             )}
-          </div>
+          </motion.div>
         ))}
       </div>
 
       {/* Input */}
-      <div className="px-5 py-3 pb-4 bg-envle-card border-t border-envle-border flex items-end gap-2.5 z-10">
-        <div className="flex-1 bg-foreground/[0.06] border border-envle-border rounded-[22px] px-4 py-2.5 flex items-center gap-2.5 focus-within:border-primary focus-within:shadow-[0_0_0_3px_hsla(142,47%,33%,0.15)]">
+      <div className="px-3 md:px-5 py-3 pb-4 bg-envle-card border-t border-envle-border flex items-end gap-2 md:gap-2.5 z-10">
+        <div className="flex-1 bg-foreground/[0.06] border border-envle-border rounded-[22px] px-3 md:px-4 py-2.5 flex items-center gap-2 focus-within:border-primary focus-within:shadow-[0_0_0_3px_hsla(142,47%,33%,0.15)]">
           <span className="text-xl cursor-pointer opacity-60 hover:opacity-100 text-envle-text-muted hover:text-envle-vert-light transition-opacity" onClick={() => toast("😀 Emojis")}>😀</span>
           <textarea
             className="flex-1 bg-transparent border-none outline-none text-foreground font-body text-sm resize-none max-h-[100px] placeholder:text-envle-text-muted"
@@ -206,25 +220,24 @@ const ChatArea = ({ conv, onOpenCall }: Props) => {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKey}
           />
-          {["📎", "📍", "💸"].map((icon) => (
-            <span key={icon} className="text-xl cursor-pointer opacity-60 hover:opacity-100 text-envle-text-muted hover:text-envle-vert-light transition-opacity" onClick={() => toast("Fonctionnalité en développement")}>
-              {icon}
-            </span>
-          ))}
+          <span className="text-xl cursor-pointer opacity-60 hover:opacity-100 text-envle-text-muted hover:text-envle-vert-light transition-opacity hidden md:inline" onClick={() => toast("Fonctionnalité en développement")}>📎</span>
         </div>
-        <button
-          className="w-12 h-12 rounded-xl bg-foreground/[0.06] border-none text-envle-text-muted text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light transition-all"
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          className="w-11 h-11 md:w-12 md:h-12 rounded-xl bg-foreground/[0.06] border-none text-envle-text-muted text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light transition-all"
           onClick={() => toast("🎤 Maintenir pour enregistrer un vocal")}
         >
           🎙️
-        </button>
-        <button
-          className="w-12 h-12 rounded-full border-none text-foreground text-xl cursor-pointer flex items-center justify-center transition-all hover:scale-[1.08] active:scale-95 shadow-[0_4px_16px_hsla(142,47%,33%,0.4)]"
+        </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          whileHover={{ scale: 1.05 }}
+          className="w-11 h-11 md:w-12 md:h-12 rounded-full border-none text-foreground text-xl cursor-pointer flex items-center justify-center shadow-[0_4px_16px_hsla(142,47%,33%,0.4)]"
           style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }}
           onClick={sendMessage}
         >
           ➤
-        </button>
+        </motion.button>
       </div>
     </main>
   );
