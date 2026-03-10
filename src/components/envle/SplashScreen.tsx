@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import envleLogo from "@/assets/envle-logo.jpg";
 
 const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
   const [hiding, setHiding] = useState(false);
@@ -21,29 +22,16 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
         className="flex flex-col items-center gap-5"
         style={{ animation: "splash-in 1s ease forwards" }}
       >
-        <div
-          className="w-[90px] h-[90px] rounded-[28px] flex items-center justify-center text-[48px]"
-          style={{
-            background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-or)))",
-            animation: "logo-pulse 2s ease infinite",
-          }}
-        >
-          🪶
-        </div>
-        <h1
-          className="font-display text-[52px] font-extrabold tracking-tight"
-          style={{
-            background: "linear-gradient(135deg, #fff 30%, hsl(var(--envle-or)))",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-          }}
-        >
-          E'nvlé
-        </h1>
+        <img
+          src={envleLogo}
+          alt="E'nvlé Logo"
+          className="w-[140px] h-[140px] object-contain"
+          style={{ animation: "logo-pulse 2s ease infinite", borderRadius: "28px" }}
+        />
         <p className="text-envle-text-muted text-sm tracking-[3px] uppercase -mt-2">
           Connecté · Créé · Célébré
         </p>
-        <div className="mt-12 w-[200px] h-[3px] rounded-full overflow-hidden bg-envle-border">
+        <div className="mt-8 w-[200px] h-[3px] rounded-full overflow-hidden bg-envle-border">
           <div
             className="h-full rounded-full"
             style={{
