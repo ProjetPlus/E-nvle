@@ -33,7 +33,13 @@ const proPages = [
 
 const categories = ["Tout", "Tech", "Design", "Marketing", "Management"];
 
-const JobsModule = ({ onBack }: { onBack: () => void }) => {
+interface Props {
+  onBack: () => void;
+  onCreateJob?: () => void;
+  onCreateBusiness?: () => void;
+}
+
+const JobsModule = ({ onBack, onCreateJob, onCreateBusiness }: Props) => {
   const [activeTab, setActiveTab] = useState<"jobs" | "pages">("jobs");
   const [activeCat, setActiveCat] = useState("Tout");
   const [jobs, setJobs] = useState(mockJobs);
@@ -51,6 +57,9 @@ const JobsModule = ({ onBack }: { onBack: () => void }) => {
         <div className="flex items-center gap-3 mb-3">
           <button className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all md:hidden" onClick={onBack}>←</button>
           <h2 className="font-display text-2xl font-bold flex-1">Emplois & Pages Pro</h2>
+          <motion.button whileTap={{ scale: 0.9 }} className="px-3 py-2 rounded-xl border-none text-xs font-semibold cursor-pointer text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={activeTab === "jobs" ? onCreateJob : onCreateBusiness}>
+            + {activeTab === "jobs" ? "Publier" : "Créer"}
+          </motion.button>
         </div>
         <div className="flex gap-1 bg-foreground/[0.04] rounded-xl p-1">
           {(["jobs", "pages"] as const).map((t) => (

@@ -24,7 +24,12 @@ const mockCalls: CallLog[] = [
 
 const tabs = ["Tous", "Manqués", "Entrants", "Sortants"];
 
-const CallsModule = ({ onBack }: { onBack: () => void }) => {
+interface Props {
+  onBack: () => void;
+  onStartCall?: (type: string) => void;
+}
+
+const CallsModule = ({ onBack, onStartCall }: Props) => {
   const [activeTab, setActiveTab] = useState("Tous");
 
   const filtered = mockCalls.filter((c) => {
@@ -42,46 +47,20 @@ const CallsModule = ({ onBack }: { onBack: () => void }) => {
       <div className="px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3">
         <button className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all md:hidden" onClick={onBack}>←</button>
         <h2 className="font-display text-2xl font-bold flex-1">Appels</h2>
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          className="px-4 py-2 rounded-xl border-none font-body text-sm cursor-pointer font-semibold text-primary-foreground"
-          style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }}
-          onClick={() => toast("📞 Nouvel appel")}
-        >
-          + Appel
-        </motion.button>
+        <motion.button whileTap={{ scale: 0.9 }} className="px-4 py-2 rounded-xl border-none font-body text-sm cursor-pointer font-semibold text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={() => onStartCall?.("audio")}>+ Appel</motion.button>
       </div>
 
       <div className="flex px-6 gap-1 py-3 border-b border-envle-border">
         {tabs.map((tab) => (
-          <motion.button
-            key={tab}
-            whileTap={{ scale: 0.95 }}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer border-none transition-all ${
-              activeTab === tab ? "bg-primary/20 text-envle-vert-light" : "bg-transparent text-envle-text-muted hover:bg-foreground/[0.04]"
-            }`}
-            onClick={() => setActiveTab(tab)}
-          >
-            {tab}
-          </motion.button>
+          <motion.button key={tab} whileTap={{ scale: 0.95 }} className={`px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer border-none transition-all ${activeTab === tab ? "bg-primary/20 text-envle-vert-light" : "bg-transparent text-envle-text-muted hover:bg-foreground/[0.04]"}`} onClick={() => setActiveTab(tab)}>{tab}</motion.button>
         ))}
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin">
         <AnimatePresence>
           {filtered.map((call, i) => (
-            <motion.div
-              key={call.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ delay: i * 0.04 }}
-              className="flex items-center gap-3 px-6 py-3.5 hover:bg-foreground/[0.03] transition-colors cursor-pointer border-b border-envle-border/50"
-              onClick={() => toast(`📞 Rappeler ${call.name}`)}
-            >
-              <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg" style={{ background: call.avatarStyle }}>
-                {call.avatar}
-              </div>
+            <motion.div key={call.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ delay: i * 0.04 }} className="flex items-center gap-3 px-6 py-3.5 hover:bg-foreground/[0.03] transition-colors cursor-pointer border-b border-envle-border/50" onClick={() => onStartCall?.("audio")}>
+              <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg" style={{ background: call.avatarStyle }}>{call.avatar}</div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold">{call.name}</div>
                 <div className={`text-xs flex items-center gap-1.5 mt-0.5 ${typeColor(call.type)}`}>
@@ -93,8 +72,8 @@ const CallsModule = ({ onBack }: { onBack: () => void }) => {
               <div className="flex flex-col items-end gap-1">
                 <span className="text-[11px] text-envle-text-muted">{call.time}</span>
                 <div className="flex gap-2">
-                  <motion.button whileTap={{ scale: 0.8 }} className="w-8 h-8 rounded-full bg-primary/15 border-none text-sm cursor-pointer flex items-center justify-center" onClick={(e) => { e.stopPropagation(); toast(`📞 Appel audio → ${call.name}`); }}>📞</motion.button>
-                  <motion.button whileTap={{ scale: 0.8 }} className="w-8 h-8 rounded-full bg-primary/15 border-none text-sm cursor-pointer flex items-center justify-center" onClick={(e) => { e.stopPropagation(); toast(`📹 Appel vidéo → ${call.name}`); }}>📹</motion.button>
+                  <motion.button whileTap={{ scale: 0.8 }} className="w-8 h-8 rounded-full bg-primary/15 border-none text-sm cursor-pointer flex items-center justify-center" onClick={(e) => { e.stopPropagation(); onStartCall?.("audio"); }}>📞</motion.button>
+                  <motion.button whileTap={{ scale: 0.8 }} className="w-8 h-8 rounded-full bg-primary/15 border-none text-sm cursor-pointer flex items-center justify-center" onClick={(e) => { e.stopPropagation(); onStartCall?.("video"); }}>📹</motion.button>
                 </div>
               </div>
             </motion.div>

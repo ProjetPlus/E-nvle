@@ -3,22 +3,26 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import type { Conversation } from "./ConversationPanel";
 import FileAttachment, { type FileAttachmentData, formatSize } from "./FileAttachment";
+import FileViewer from "./FileViewer";
+import { getTranslatedText } from "@/lib/translator";
 
 interface Message {
   id: string;
   text: string;
+  originalText?: string;
   sent: boolean;
   time: string;
   isVoice?: boolean;
   isImage?: boolean;
   isTyping?: boolean;
   files?: FileAttachmentData[];
+  senderLang?: string;
 }
 
 const initialMessages: Message[] = [
-  { id: "1", text: "Salut! Tu as vu la dernière mise à jour de E'nvlé? 🚀", sent: false, time: "09:30" },
+  { id: "1", text: "Salut! Tu as vu la dernière mise à jour de E'nvlé? 🚀", sent: false, time: "09:30", senderLang: "fr" },
   { id: "2", text: "Oui! Le nouveau module commerce est 🔥 J'ai déjà créé ma boutique", sent: true, time: "09:32" },
-  { id: "3", text: "Regarde ce tissu wax que j'ai trouvé!", sent: false, time: "09:35", isImage: true },
+  { id: "3", text: "Regarde ce tissu wax que j'ai trouvé!", sent: false, time: "09:35", isImage: true, senderLang: "fr" },
   { id: "4", text: "Magnifique 😍 tu l'as commandé via la boutique?", sent: true, time: "09:36" },
   { id: "5", text: "", sent: false, time: "09:40", isVoice: true },
   { id: "6", text: "Ok je regarde ça maintenant 🙏 Je t'envoie le reçu IA généré automatiquement dès que c'est fait!", sent: true, time: "09:42" },
@@ -43,6 +47,8 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
   const [input, setInput] = useState("");
   const [attachOpen, setAttachOpen] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<FileAttachmentData[]>([]);
+  const [viewingFile, setViewingFile] = useState<FileAttachmentData | null>(null);
+  const [showTranslation, setShowTranslation] = useState<Record<string, boolean>>({});
   const areaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -62,37 +68,28 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
     setTimeout(() => {
       const typingId = `typing-${Date.now()}`;
       setMessages((prev) => [...prev, { id: typingId, text: "", sent: false, time: "", isTyping: true }]);
-
       setTimeout(() => {
         const reply = replies[Math.floor(Math.random() * replies.length)];
         setMessages((prev) => [
           ...prev.filter((m) => m.id !== typingId),
-          { id: `reply-${Date.now()}`, text: reply, sent: false, time },
+          { id: `reply-${Date.now()}`, text: reply, sent: false, time, senderLang: "fr" },
         ]);
       }, 2000);
     }, 1500);
   };
 
   const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
-  const handleFilesSelected = (files: FileAttachmentData[]) => {
-    setPendingFiles((prev) => [...prev, ...files]);
-  };
-
-  const removePendingFile = (id: string) => {
-    setPendingFiles((prev) => prev.filter((f) => f.id !== id));
-  };
+  const handleFilesSelected = (files: FileAttachmentData[]) => setPendingFiles((prev) => [...prev, ...files]);
+  const removePendingFile = (id: string) => setPendingFiles((prev) => prev.filter((f) => f.id !== id));
 
   const downloadFile = (file: FileAttachmentData) => {
     const url = URL.createObjectURL(file.file);
     const a = document.createElement("a");
     a.href = url;
-    a.download = file.name; // preserves original filename
+    a.download = file.name;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -106,9 +103,17 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
     if (type.startsWith("audio/")) return "🎵";
     if (type.includes("pdf")) return "📄";
     if (type.includes("zip") || type.includes("rar")) return "📦";
-    if (type.includes("doc") || type.includes("word")) return "📝";
-    if (type.includes("sheet") || type.includes("excel") || type.includes("csv")) return "📊";
     return "📁";
+  };
+
+  const toggleTranslation = (msgId: string) => {
+    setShowTranslation((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
+  };
+
+  const getDisplayText = (msg: Message) => {
+    if (!msg.senderLang || msg.sent) return msg.text;
+    if (showTranslation[msg.id]) return getTranslatedText(msg.text, msg.senderLang);
+    return msg.text;
   };
 
   return (
@@ -117,9 +122,7 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
 
       {/* Header */}
       <div className="px-4 md:px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3 z-10">
-        {onBack && (
-          <motion.button whileTap={{ scale: 0.9 }} className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all" onClick={onBack}>←</motion.button>
-        )}
+        {onBack && <motion.button whileTap={{ scale: 0.9 }} className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all" onClick={onBack}>←</motion.button>}
         <div className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-lg" style={{ background: conv.avatarStyle }}>{conv.avatar}</div>
         <div className="flex-1 min-w-0">
           <div className="text-base font-bold truncate">{conv.name}</div>
@@ -127,7 +130,7 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
         </div>
         <div className="flex gap-1.5 md:gap-2">
           {["📞", "📹", "🔍"].map((icon, i) => (
-            <motion.button key={i} whileTap={{ scale: 0.9 }} className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-foreground/[0.06] border-none text-envle-text-muted text-lg cursor-pointer transition-all flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light" onClick={() => { if (icon === "📞") onOpenCall("audio"); else if (icon === "📹") onOpenCall("video"); else toast("Fonctionnalité en développement"); }}>{icon}</motion.button>
+            <motion.button key={i} whileTap={{ scale: 0.9 }} className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-foreground/[0.06] border-none text-envle-text-muted text-lg cursor-pointer transition-all flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light" onClick={() => { if (icon === "📞") onOpenCall("audio"); else if (icon === "📹") onOpenCall("video"); else toast("🔍 Rechercher dans la conversation"); }}>{icon}</motion.button>
           ))}
         </div>
       </div>
@@ -153,7 +156,7 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
             ) : (
               <div className={`max-w-[80%] md:max-w-[65%] px-3.5 py-2.5 rounded-[18px] text-sm leading-relaxed ${msg.sent ? "rounded-br-[6px] text-foreground" : "bg-envle-card border border-envle-border rounded-bl-[6px]"}`} style={msg.sent ? { background: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))" } : undefined}>
                 {msg.isImage && (
-                  <div className="w-[200px] h-[140px] rounded-xl mb-1.5 flex items-center justify-center text-[40px]" style={{ background: "linear-gradient(135deg, #1a2a1a, #2d4a2d)" }}>🖼️</div>
+                  <div className="w-[200px] h-[140px] rounded-xl mb-1.5 flex items-center justify-center text-[40px] cursor-pointer" style={{ background: "linear-gradient(135deg, #1a2a1a, #2d4a2d)" }} onClick={() => toast("🖼️ Ouvrir la photo")}>🖼️</div>
                 )}
                 {msg.isVoice ? (
                   <div className="flex items-center gap-2.5 px-3 py-2">
@@ -167,31 +170,23 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
                   </div>
                 ) : (
                   <>
-                    {msg.text && <span>{msg.text}</span>}
-                    {/* File attachments */}
+                    {msg.text && <span>{getDisplayText(msg)}</span>}
+                    {/* Translation toggle */}
+                    {msg.senderLang && !msg.sent && msg.text && (
+                      <button className="block text-[10px] mt-1 opacity-50 hover:opacity-80 border-none bg-transparent cursor-pointer font-body text-current" onClick={() => toggleTranslation(msg.id)}>
+                        {showTranslation[msg.id] ? "🌐 Voir l'original" : "🌐 Traduire"}
+                      </button>
+                    )}
                     {msg.files && msg.files.length > 0 && (
                       <div className="mt-1.5 flex flex-col gap-1.5">
                         {msg.files.map((file) => (
-                          <motion.div
-                            key={file.id}
-                            whileHover={{ scale: 1.02 }}
-                            className="flex items-center gap-2 bg-foreground/10 rounded-xl px-3 py-2 cursor-pointer"
-                            onClick={() => downloadFile(file)}
-                          >
-                            {file.preview ? (
-                              <img src={file.preview} alt={file.name} className="w-10 h-10 rounded-lg object-cover" />
-                            ) : (
-                              <span className="text-2xl">{fileIcon(file.type)}</span>
-                            )}
+                          <motion.div key={file.id} whileHover={{ scale: 1.02 }} className="flex items-center gap-2 bg-foreground/10 rounded-xl px-3 py-2 cursor-pointer" onClick={() => setViewingFile(file)}>
+                            {file.preview ? <img src={file.preview} alt={file.name} className="w-10 h-10 rounded-lg object-cover" /> : <span className="text-2xl">{fileIcon(file.type)}</span>}
                             <div className="flex-1 min-w-0">
                               <div className="text-xs font-semibold truncate">{file.name}</div>
-                              <div className="text-[10px] opacity-60 flex items-center gap-1">
-                                {formatSize(file.size)}
-                                {file.compressed && <span>· Compressé</span>}
-                                {file.enhanced && <span>· HD ✨</span>}
-                              </div>
+                              <div className="text-[10px] opacity-60 flex items-center gap-1">{formatSize(file.size)}{file.compressed && <span>· Compressé</span>}{file.enhanced && <span>· HD ✨</span>}</div>
                             </div>
-                            <span className="text-sm opacity-60">📥</span>
+                            <span className="text-sm opacity-60" onClick={(e) => { e.stopPropagation(); downloadFile(file); }}>📥</span>
                           </motion.div>
                         ))}
                       </div>
@@ -208,16 +203,12 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
         ))}
       </div>
 
-      {/* Pending files preview */}
+      {/* Pending files */}
       {pendingFiles.length > 0 && (
         <div className="px-3 md:px-5 py-2 bg-envle-card border-t border-envle-border z-10 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
           {pendingFiles.map((file) => (
             <motion.div key={file.id} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative shrink-0 flex items-center gap-2 bg-foreground/[0.06] border border-envle-border rounded-xl px-3 py-2">
-              {file.preview ? (
-                <img src={file.preview} alt={file.name} className="w-8 h-8 rounded-lg object-cover" />
-              ) : (
-                <span className="text-xl">{fileIcon(file.type)}</span>
-              )}
+              {file.preview ? <img src={file.preview} alt={file.name} className="w-8 h-8 rounded-lg object-cover" /> : <span className="text-xl">{fileIcon(file.type)}</span>}
               <div className="max-w-[120px]">
                 <div className="text-xs font-medium truncate">{file.name}</div>
                 <div className="text-[10px] text-envle-text-muted">{formatSize(file.size)}</div>
@@ -238,6 +229,9 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
         <motion.button whileTap={{ scale: 0.9 }} className="w-11 h-11 md:w-12 md:h-12 rounded-xl bg-foreground/[0.06] border-none text-envle-text-muted text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light transition-all" onClick={() => toast("🎤 Maintenir pour enregistrer un vocal")}>🎙️</motion.button>
         <motion.button whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }} className="w-11 h-11 md:w-12 md:h-12 rounded-full border-none text-foreground text-xl cursor-pointer flex items-center justify-center shadow-[0_4px_16px_hsla(142,47%,33%,0.4)]" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={sendMessage}>➤</motion.button>
       </div>
+
+      {/* File viewer */}
+      {viewingFile && <FileViewer file={viewingFile} onClose={() => setViewingFile(null)} />}
     </main>
   );
 };
