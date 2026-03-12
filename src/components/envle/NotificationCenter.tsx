@@ -42,46 +42,47 @@ const NotificationCenter = ({ open, onClose, notifications, onMarkAllRead, onCle
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm" onClick={onClose} />
           <motion.div
-            initial={{ opacity: 0, x: 300 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 300 }}
-            transition={{ type: "spring", damping: 25 }}
+            initial={{ opacity: 0, x: 300, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 300, scale: 0.95 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="fixed right-0 top-0 bottom-0 w-[380px] max-w-[90vw] z-[201] bg-envle-card border-l border-envle-border flex flex-col"
           >
-            <div className="p-5 border-b border-envle-border">
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="p-5 border-b border-envle-border">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-display text-xl font-bold">Notifications</h2>
-                <motion.button whileTap={{ scale: 0.9 }} className="w-8 h-8 rounded-lg bg-foreground/[0.06] border-none text-sm cursor-pointer flex items-center justify-center" onClick={onClose}>✕</motion.button>
+                <motion.button whileTap={{ scale: 0.85 }} whileHover={{ rotate: 90 }} className="w-8 h-8 rounded-lg bg-foreground/[0.06] border-none text-sm cursor-pointer flex items-center justify-center" onClick={onClose}>✕</motion.button>
               </div>
               <div className="flex items-center gap-2">
                 {(["all", "unread"] as const).map((f) => (
-                  <button key={f} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-none cursor-pointer transition-all ${filter === f ? "bg-primary/20 text-envle-vert-light" : "bg-foreground/[0.04] text-envle-text-muted"}`} onClick={() => setFilter(f)}>
+                  <motion.button key={f} whileTap={{ scale: 0.92 }} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-none cursor-pointer transition-all ${filter === f ? "bg-primary/20 text-envle-vert-light" : "bg-foreground/[0.04] text-envle-text-muted"}`} onClick={() => setFilter(f)}>
                     {f === "all" ? "Toutes" : `Non lues (${unreadCount})`}
-                  </button>
+                  </motion.button>
                 ))}
                 <div className="flex-1" />
-                <button className="text-xs text-envle-text-muted border-none bg-transparent cursor-pointer hover:text-foreground font-body" onClick={onMarkAllRead}>Tout lire</button>
-                <button className="text-xs text-envle-rouge border-none bg-transparent cursor-pointer hover:text-foreground font-body" onClick={onClearAll}>Effacer</button>
+                <motion.button whileTap={{ scale: 0.9 }} className="text-xs text-envle-text-muted border-none bg-transparent cursor-pointer hover:text-foreground font-body" onClick={onMarkAllRead}>Tout lire</motion.button>
+                <motion.button whileTap={{ scale: 0.9 }} className="text-xs text-envle-rouge border-none bg-transparent cursor-pointer hover:text-foreground font-body" onClick={onClearAll}>Effacer</motion.button>
               </div>
-            </div>
+            </motion.div>
 
             <div className="flex-1 overflow-y-auto scrollbar-thin">
               <AnimatePresence>
                 {filtered.map((n, i) => (
                   <motion.div
                     key={n.id}
-                    initial={{ opacity: 0, x: 20 }}
+                    initial={{ opacity: 0, x: 30 }}
                     animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ delay: i * 0.03 }}
-                    className={`flex items-start gap-3 px-5 py-4 border-b border-envle-border/50 cursor-pointer hover:bg-foreground/[0.03] transition-colors ${!n.read ? "bg-primary/[0.04]" : ""}`}
+                    exit={{ opacity: 0, x: -30, height: 0 }}
+                    transition={{ delay: i * 0.04, type: "spring", stiffness: 300, damping: 25 }}
+                    whileHover={{ x: -3, backgroundColor: "hsla(142, 47%, 33%, 0.03)" }}
+                    className={`flex items-start gap-3 px-5 py-4 border-b border-envle-border/50 cursor-pointer transition-colors ${!n.read ? "bg-primary/[0.04]" : ""}`}
                     onClick={() => toast(`📌 ${n.title}`)}
                   >
-                    <div className="w-10 h-10 rounded-full bg-foreground/[0.08] flex items-center justify-center text-xl shrink-0">{n.icon}</div>
+                    <motion.div whileHover={{ scale: 1.15, rotate: 10 }} className="w-10 h-10 rounded-full bg-foreground/[0.08] flex items-center justify-center text-xl shrink-0">{n.icon}</motion.div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold">{n.title}</span>
-                        {!n.read && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
+                        {!n.read && <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500 }} className="w-2 h-2 rounded-full bg-primary shrink-0" />}
                       </div>
                       <p className="text-xs text-envle-text-muted mt-0.5 truncate">{n.body}</p>
                       <span className="text-[10px] text-envle-text-muted mt-1 block">{n.time}</span>
@@ -90,10 +91,10 @@ const NotificationCenter = ({ open, onClose, notifications, onMarkAllRead, onCle
                 ))}
               </AnimatePresence>
               {filtered.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-16 text-envle-text-muted">
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-16 text-envle-text-muted">
                   <span className="text-4xl mb-3">🔔</span>
                   <span className="text-sm">Aucune notification</span>
-                </div>
+                </motion.div>
               )}
             </div>
           </motion.div>
