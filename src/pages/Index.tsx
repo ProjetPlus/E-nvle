@@ -22,10 +22,10 @@ import CreateBusinessModal from "@/components/envle/CreateBusinessModal";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const pageTransition = {
-  initial: { opacity: 0, x: 30 },
-  animate: { opacity: 1, x: 0 },
-  exit: { opacity: 0, x: -30 },
-  transition: { duration: 0.25, ease: "easeInOut" as const },
+  initial: { opacity: 0, x: 20, scale: 0.98 },
+  animate: { opacity: 1, x: 0, scale: 1 },
+  exit: { opacity: 0, x: -20, scale: 0.98 },
+  transition: { duration: 0.25, type: "spring" as const, stiffness: 300, damping: 30 },
 };
 
 const defaultConv: Conversation = {
@@ -138,7 +138,14 @@ const Index = () => {
         />
 
         {isMobile && appVisible && (
-          <motion.button whileTap={{ scale: 0.9 }} className="fixed top-3 left-3 z-[140] w-10 h-10 rounded-xl bg-envle-card border border-envle-border flex items-center justify-center text-lg cursor-pointer shadow-lg" onClick={() => setSidebarOpen(true)}>☰</motion.button>
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            whileHover={{ scale: 1.05 }}
+            className="fixed top-3 left-3 z-[140] w-10 h-10 rounded-xl bg-envle-card border border-envle-border flex items-center justify-center text-lg cursor-pointer shadow-lg"
+            onClick={() => setSidebarOpen(true)}
+          >
+            ☰
+          </motion.button>
         )}
 
         {renderMainContent()}

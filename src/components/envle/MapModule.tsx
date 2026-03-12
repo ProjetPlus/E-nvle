@@ -37,38 +37,44 @@ const MapModule = ({ onBack }: { onBack: () => void }) => {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
-      <div className="px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3">
-        <button className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all md:hidden" onClick={onBack}>←</button>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3">
+        <motion.button whileTap={{ scale: 0.85 }} className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all md:hidden" onClick={onBack}>←</motion.button>
         <h2 className="font-display text-2xl font-bold flex-1">Carte & Localisation</h2>
         <motion.button
           whileTap={{ scale: 0.9 }}
+          whileHover={{ scale: 1.05 }}
           className={`px-4 py-2 rounded-xl border text-sm font-semibold cursor-pointer transition-all ${showFriends ? "bg-primary/20 border-primary/30 text-envle-vert-light" : "border-envle-border text-envle-text-muted"}`}
           onClick={() => setShowFriends(!showFriends)}
         >
           👥 Amis
         </motion.button>
-      </div>
+      </motion.div>
 
       {/* Map placeholder */}
-      <div className="h-[200px] relative overflow-hidden" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-fond)))" }}>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.1 }}
+        className="h-[200px] relative overflow-hidden"
+        style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-fond)))" }}
+      >
         <div className="absolute inset-0 flex items-center justify-center flex-col gap-2">
-          <span className="text-6xl">🗺️</span>
+          <motion.span animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }} className="text-6xl">🗺️</motion.span>
           <span className="text-sm text-envle-text-muted">Carte interactive — Abidjan, CI</span>
-          <span className="text-xs text-envle-vert-light">📍 Position actuelle: Plateau</span>
+          <motion.span animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 2, repeat: Infinity }} className="text-xs text-envle-vert-light">📍 Position actuelle: Plateau</motion.span>
         </div>
-        {/* Floating pins */}
         {[{ top: "20%", left: "30%", icon: "📍" }, { top: "40%", left: "60%", icon: "📍" }, { top: "60%", left: "45%", icon: "📍" }, { top: "35%", left: "75%", icon: "👤" }].map((pin, i) => (
-          <motion.div key={i} className="absolute text-xl" style={{ top: pin.top, left: pin.left }} animate={{ y: [0, -5, 0] }} transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}>{pin.icon}</motion.div>
+          <motion.div key={i} className="absolute text-xl cursor-pointer" style={{ top: pin.top, left: pin.left }} animate={{ y: [0, -5, 0] }} transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }} whileHover={{ scale: 1.3 }}>{pin.icon}</motion.div>
         ))}
-      </div>
+      </motion.div>
 
       {/* Nearby friends */}
       <AnimatePresence>
         {showFriends && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-b border-envle-border">
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} className="overflow-hidden border-b border-envle-border">
             <div className="px-6 py-3 flex gap-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-              {nearbyFriends.map((f) => (
-                <motion.div key={f.name} whileTap={{ scale: 0.95 }} className="flex items-center gap-2 bg-envle-card border border-envle-border rounded-full px-3 py-2 shrink-0 cursor-pointer" onClick={() => toast(`📍 ${f.name} est à ${f.distance}`)}>
+              {nearbyFriends.map((f, i) => (
+                <motion.div key={f.name} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.06 }} whileTap={{ scale: 0.92 }} whileHover={{ y: -2 }} className="flex items-center gap-2 bg-envle-card border border-envle-border rounded-full px-3 py-2 shrink-0 cursor-pointer" onClick={() => toast(`📍 ${f.name} est à ${f.distance}`)}>
                   <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: f.avatarStyle }}>{f.avatar}</div>
                   <span className="text-xs font-semibold">{f.name}</span>
                   <span className="text-[10px] text-envle-text-muted">{f.distance}</span>
@@ -81,16 +87,25 @@ const MapModule = ({ onBack }: { onBack: () => void }) => {
 
       {/* Categories */}
       <div className="flex px-6 gap-2 py-3 overflow-x-auto border-b border-envle-border" style={{ scrollbarWidth: "none" }}>
-        {categories.map((cat) => (
-          <motion.button key={cat} whileTap={{ scale: 0.95 }} className={`px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer border-none transition-all whitespace-nowrap ${activeCat === cat ? "bg-primary/20 text-envle-vert-light" : "bg-foreground/[0.04] text-envle-text-muted"}`} onClick={() => setActiveCat(cat)}>{cat}</motion.button>
+        {categories.map((cat, i) => (
+          <motion.button key={cat} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} whileTap={{ scale: 0.92 }} whileHover={{ y: -1 }} className={`px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer border-none transition-all whitespace-nowrap ${activeCat === cat ? "bg-primary/20 text-envle-vert-light" : "bg-foreground/[0.04] text-envle-text-muted"}`} onClick={() => setActiveCat(cat)}>{cat}</motion.button>
         ))}
       </div>
 
       {/* Places list */}
       <div className="flex-1 overflow-y-auto scrollbar-thin">
         {mockPlaces.map((place, i) => (
-          <motion.div key={place.id} initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }} className="flex items-center gap-3 px-6 py-3.5 hover:bg-foreground/[0.03] transition-colors cursor-pointer border-b border-envle-border/50" onClick={() => toast(`📍 Navigation vers ${place.name}`)}>
-            <div className="w-12 h-12 rounded-[14px] flex items-center justify-center text-2xl shrink-0" style={{ background: place.bgStyle }}>{place.icon}</div>
+          <motion.div
+            key={place.id}
+            initial={{ opacity: 0, x: -15 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.05, type: "spring", stiffness: 300, damping: 25 }}
+            whileHover={{ x: 4, backgroundColor: "hsla(142, 47%, 33%, 0.03)" }}
+            whileTap={{ scale: 0.98 }}
+            className="flex items-center gap-3 px-6 py-3.5 transition-colors cursor-pointer border-b border-envle-border/50"
+            onClick={() => toast(`📍 Navigation vers ${place.name}`)}
+          >
+            <motion.div whileHover={{ scale: 1.1, rotate: 5 }} className="w-12 h-12 rounded-[14px] flex items-center justify-center text-2xl shrink-0" style={{ background: place.bgStyle }}>{place.icon}</motion.div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold flex items-center gap-2">
                 {place.name}
@@ -103,7 +118,7 @@ const MapModule = ({ onBack }: { onBack: () => void }) => {
             </div>
             <div className="text-right shrink-0">
               <div className="text-sm font-semibold text-envle-vert-light">{place.distance}</div>
-              <motion.button whileTap={{ scale: 0.9 }} className="text-xs text-envle-text-muted mt-1 bg-transparent border-none cursor-pointer hover:text-envle-vert-light" onClick={(e) => { e.stopPropagation(); toast("🧭 Navigation démarrée"); }}>Itinéraire →</motion.button>
+              <motion.button whileTap={{ scale: 0.85 }} className="text-xs text-envle-text-muted mt-1 bg-transparent border-none cursor-pointer hover:text-envle-vert-light" onClick={(e) => { e.stopPropagation(); toast("🧭 Navigation démarrée"); }}>Itinéraire →</motion.button>
             </div>
           </motion.div>
         ))}

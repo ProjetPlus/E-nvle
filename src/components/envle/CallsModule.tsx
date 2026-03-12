@@ -44,23 +44,34 @@ const CallsModule = ({ onBack, onStartCall }: Props) => {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
-      <div className="px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3">
-        <button className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all md:hidden" onClick={onBack}>←</button>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3">
+        <motion.button whileTap={{ scale: 0.85 }} className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all md:hidden" onClick={onBack}>←</motion.button>
         <h2 className="font-display text-2xl font-bold flex-1">Appels</h2>
-        <motion.button whileTap={{ scale: 0.9 }} className="px-4 py-2 rounded-xl border-none font-body text-sm cursor-pointer font-semibold text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={() => onStartCall?.("audio")}>+ Appel</motion.button>
-      </div>
+        <motion.button whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05, y: -1 }} className="px-4 py-2 rounded-xl border-none font-body text-sm cursor-pointer font-semibold text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={() => onStartCall?.("audio")}>+ Appel</motion.button>
+      </motion.div>
 
       <div className="flex px-6 gap-1 py-3 border-b border-envle-border">
-        {tabs.map((tab) => (
-          <motion.button key={tab} whileTap={{ scale: 0.95 }} className={`px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer border-none transition-all ${activeTab === tab ? "bg-primary/20 text-envle-vert-light" : "bg-transparent text-envle-text-muted hover:bg-foreground/[0.04]"}`} onClick={() => setActiveTab(tab)}>{tab}</motion.button>
+        {tabs.map((tab, i) => (
+          <motion.button key={tab} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} whileTap={{ scale: 0.92 }} whileHover={{ y: -1 }} className={`px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer border-none transition-all ${activeTab === tab ? "bg-primary/20 text-envle-vert-light" : "bg-transparent text-envle-text-muted hover:bg-foreground/[0.04]"}`} onClick={() => setActiveTab(tab)}>{tab}</motion.button>
         ))}
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin">
-        <AnimatePresence>
+        <AnimatePresence mode="popLayout">
           {filtered.map((call, i) => (
-            <motion.div key={call.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ delay: i * 0.04 }} className="flex items-center gap-3 px-6 py-3.5 hover:bg-foreground/[0.03] transition-colors cursor-pointer border-b border-envle-border/50" onClick={() => onStartCall?.("audio")}>
-              <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg" style={{ background: call.avatarStyle }}>{call.avatar}</div>
+            <motion.div
+              key={call.id}
+              layout
+              initial={{ opacity: 0, x: -20, scale: 0.98 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ delay: i * 0.04, type: "spring", stiffness: 300, damping: 25 }}
+              whileHover={{ x: 4, backgroundColor: "hsla(142, 47%, 33%, 0.03)" }}
+              whileTap={{ scale: 0.98 }}
+              className="flex items-center gap-3 px-6 py-3.5 transition-colors cursor-pointer border-b border-envle-border/50"
+              onClick={() => onStartCall?.("audio")}
+            >
+              <motion.div whileHover={{ scale: 1.08 }} className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg" style={{ background: call.avatarStyle }}>{call.avatar}</motion.div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold">{call.name}</div>
                 <div className={`text-xs flex items-center gap-1.5 mt-0.5 ${typeColor(call.type)}`}>
@@ -72,8 +83,8 @@ const CallsModule = ({ onBack, onStartCall }: Props) => {
               <div className="flex flex-col items-end gap-1">
                 <span className="text-[11px] text-envle-text-muted">{call.time}</span>
                 <div className="flex gap-2">
-                  <motion.button whileTap={{ scale: 0.8 }} className="w-8 h-8 rounded-full bg-primary/15 border-none text-sm cursor-pointer flex items-center justify-center" onClick={(e) => { e.stopPropagation(); onStartCall?.("audio"); }}>📞</motion.button>
-                  <motion.button whileTap={{ scale: 0.8 }} className="w-8 h-8 rounded-full bg-primary/15 border-none text-sm cursor-pointer flex items-center justify-center" onClick={(e) => { e.stopPropagation(); onStartCall?.("video"); }}>📹</motion.button>
+                  <motion.button whileTap={{ scale: 0.75 }} whileHover={{ scale: 1.15 }} className="w-8 h-8 rounded-full bg-primary/15 border-none text-sm cursor-pointer flex items-center justify-center" onClick={(e) => { e.stopPropagation(); onStartCall?.("audio"); }}>📞</motion.button>
+                  <motion.button whileTap={{ scale: 0.75 }} whileHover={{ scale: 1.15 }} className="w-8 h-8 rounded-full bg-primary/15 border-none text-sm cursor-pointer flex items-center justify-center" onClick={(e) => { e.stopPropagation(); onStartCall?.("video"); }}>📹</motion.button>
                 </div>
               </div>
             </motion.div>

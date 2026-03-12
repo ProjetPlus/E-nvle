@@ -53,37 +53,47 @@ const JobsModule = ({ onBack, onCreateJob, onCreateBusiness }: Props) => {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
-      <div className="px-6 py-4 bg-envle-card border-b border-envle-border">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="px-6 py-4 bg-envle-card border-b border-envle-border">
         <div className="flex items-center gap-3 mb-3">
-          <button className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all md:hidden" onClick={onBack}>←</button>
+          <motion.button whileTap={{ scale: 0.85 }} className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all md:hidden" onClick={onBack}>←</motion.button>
           <h2 className="font-display text-2xl font-bold flex-1">Emplois & Pages Pro</h2>
-          <motion.button whileTap={{ scale: 0.9 }} className="px-3 py-2 rounded-xl border-none text-xs font-semibold cursor-pointer text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={activeTab === "jobs" ? onCreateJob : onCreateBusiness}>
+          <motion.button whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05, y: -1 }} className="px-3 py-2 rounded-xl border-none text-xs font-semibold cursor-pointer text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={activeTab === "jobs" ? onCreateJob : onCreateBusiness}>
             + {activeTab === "jobs" ? "Publier" : "Créer"}
           </motion.button>
         </div>
         <div className="flex gap-1 bg-foreground/[0.04] rounded-xl p-1">
           {(["jobs", "pages"] as const).map((t) => (
-            <button key={t} className={`flex-1 py-2 rounded-[10px] border-none font-body text-sm cursor-pointer font-medium transition-all ${activeTab === t ? "bg-primary text-primary-foreground" : "bg-transparent text-envle-text-muted"}`} onClick={() => setActiveTab(t)}>
+            <motion.button key={t} whileTap={{ scale: 0.95 }} className={`flex-1 py-2 rounded-[10px] border-none font-body text-sm cursor-pointer font-medium transition-all ${activeTab === t ? "bg-primary text-primary-foreground" : "bg-transparent text-envle-text-muted"}`} onClick={() => setActiveTab(t)}>
               {t === "jobs" ? "💼 Emplois" : "🏢 Pages Pro"}
-            </button>
+            </motion.button>
           ))}
         </div>
-      </div>
+      </motion.div>
 
       {activeTab === "jobs" ? (
         <>
           <div className="flex px-6 gap-2 py-3 overflow-x-auto border-b border-envle-border" style={{ scrollbarWidth: "none" }}>
-            {categories.map((cat) => (
-              <motion.button key={cat} whileTap={{ scale: 0.95 }} className={`px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer border-none transition-all whitespace-nowrap ${activeCat === cat ? "bg-primary/20 text-envle-vert-light" : "bg-foreground/[0.04] text-envle-text-muted"}`} onClick={() => setActiveCat(cat)}>{cat}</motion.button>
+            {categories.map((cat, i) => (
+              <motion.button key={cat} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} whileTap={{ scale: 0.92 }} whileHover={{ y: -1 }} className={`px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer border-none transition-all whitespace-nowrap ${activeCat === cat ? "bg-primary/20 text-envle-vert-light" : "bg-foreground/[0.04] text-envle-text-muted"}`} onClick={() => setActiveCat(cat)}>{cat}</motion.button>
             ))}
           </div>
           <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
             <div className="flex flex-col gap-3">
-              <AnimatePresence>
+              <AnimatePresence mode="popLayout">
                 {filtered.map((job, i) => (
-                  <motion.div key={job.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ delay: i * 0.05 }} className="bg-envle-card border border-envle-border rounded-2xl p-4 hover:border-primary/30 transition-all cursor-pointer" onClick={() => toast(`📋 Détails: ${job.title}`)}>
+                  <motion.div
+                    key={job.id}
+                    layout
+                    initial={{ opacity: 0, y: 15, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ delay: i * 0.05, type: "spring", stiffness: 300, damping: 25 }}
+                    whileHover={{ y: -2, scale: 1.01 }}
+                    className="bg-envle-card border border-envle-border rounded-2xl p-4 hover:border-primary/30 transition-all cursor-pointer hover:shadow-[0_4px_20px_hsla(142,47%,33%,0.08)]"
+                    onClick={() => toast(`📋 Détails: ${job.title}`)}
+                  >
                     <div className="flex items-start gap-3">
-                      <div className="w-12 h-12 rounded-[14px] flex items-center justify-center text-2xl shrink-0" style={{ background: job.bgStyle }}>{job.icon}</div>
+                      <motion.div whileHover={{ scale: 1.1, rotate: 5 }} className="w-12 h-12 rounded-[14px] flex items-center justify-center text-2xl shrink-0" style={{ background: job.bgStyle }}>{job.icon}</motion.div>
                       <div className="flex-1 min-w-0">
                         <div className="text-base font-bold">{job.title}</div>
                         <div className="text-sm text-envle-text-muted">{job.company}</div>
@@ -93,11 +103,11 @@ const JobsModule = ({ onBack, onCreateJob, onCreateBusiness }: Props) => {
                           <span className="text-xs text-envle-or font-semibold">{job.salary}</span>
                         </div>
                       </div>
-                      <motion.button whileTap={{ scale: 1.2 }} className="border-none bg-transparent text-lg cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleSave(job.id); }}>{job.isSaved ? "📌" : "📍"}</motion.button>
+                      <motion.button whileTap={{ scale: 1.3 }} className="border-none bg-transparent text-lg cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleSave(job.id); }}>{job.isSaved ? "📌" : "📍"}</motion.button>
                     </div>
                     <div className="flex items-center justify-between mt-3 pt-3 border-t border-envle-border/50">
                       <span className="text-xs text-envle-text-muted">{job.posted} · {job.applicants} candidats</span>
-                      <motion.button whileTap={{ scale: 0.9 }} className="px-4 py-1.5 rounded-lg border-none text-xs font-semibold cursor-pointer text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={(e) => { e.stopPropagation(); toast("📤 Candidature envoyée!"); }}>Postuler</motion.button>
+                      <motion.button whileTap={{ scale: 0.88 }} whileHover={{ scale: 1.05 }} className="px-4 py-1.5 rounded-lg border-none text-xs font-semibold cursor-pointer text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={(e) => { e.stopPropagation(); toast("📤 Candidature envoyée!"); }}>Postuler</motion.button>
                     </div>
                   </motion.div>
                 ))}
@@ -109,13 +119,21 @@ const JobsModule = ({ onBack, onCreateJob, onCreateBusiness }: Props) => {
         <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
           <div className="flex flex-col gap-3">
             {proPages.map((page, i) => (
-              <motion.div key={page.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="bg-envle-card border border-envle-border rounded-2xl p-4 flex items-center gap-3 hover:border-primary/30 transition-all cursor-pointer" onClick={() => toast(`🏢 Page: ${page.name}`)}>
-                <div className="w-14 h-14 rounded-[14px] flex items-center justify-center text-2xl" style={{ background: page.bgStyle }}>{page.icon}</div>
+              <motion.div
+                key={page.id}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.06, type: "spring", stiffness: 300, damping: 25 }}
+                whileHover={{ y: -2, scale: 1.01 }}
+                className="bg-envle-card border border-envle-border rounded-2xl p-4 flex items-center gap-3 hover:border-primary/30 transition-all cursor-pointer hover:shadow-[0_4px_20px_hsla(142,47%,33%,0.08)]"
+                onClick={() => toast(`🏢 Page: ${page.name}`)}
+              >
+                <motion.div whileHover={{ scale: 1.1, rotate: 5 }} className="w-14 h-14 rounded-[14px] flex items-center justify-center text-2xl" style={{ background: page.bgStyle }}>{page.icon}</motion.div>
                 <div className="flex-1">
                   <div className="text-base font-bold">{page.name}</div>
                   <div className="text-xs text-envle-text-muted">{page.type} · {page.followers} abonnés</div>
                 </div>
-                <motion.button whileTap={{ scale: 0.9 }} className="px-4 py-2 rounded-xl border border-primary/30 bg-primary/10 text-envle-vert-light text-xs font-semibold cursor-pointer" onClick={(e) => { e.stopPropagation(); toast(`✅ Abonné à ${page.name}`); }}>Suivre</motion.button>
+                <motion.button whileTap={{ scale: 0.88 }} whileHover={{ scale: 1.05 }} className="px-4 py-2 rounded-xl border border-primary/30 bg-primary/10 text-envle-vert-light text-xs font-semibold cursor-pointer" onClick={(e) => { e.stopPropagation(); toast(`✅ Abonné à ${page.name}`); }}>Suivre</motion.button>
               </motion.div>
             ))}
           </div>

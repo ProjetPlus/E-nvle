@@ -35,11 +35,7 @@ const CommunityModule = ({ onBack }: { onBack: () => void }) => {
 
   const toggleJoin = (id: string) => {
     setCommunities((prev) =>
-      prev.map((c) =>
-        c.id === id
-          ? { ...c, isJoined: !c.isJoined, members: c.isJoined ? c.members - 1 : c.members + 1 }
-          : c
-      )
+      prev.map((c) => c.id === id ? { ...c, isJoined: !c.isJoined, members: c.isJoined ? c.members - 1 : c.members + 1 } : c)
     );
     const c = communities.find((c) => c.id === id);
     toast(c?.isJoined ? `👋 Vous avez quitté ${c.name}` : `✅ Bienvenue dans ${c?.name}!`);
@@ -49,69 +45,40 @@ const CommunityModule = ({ onBack }: { onBack: () => void }) => {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
-      {/* Header */}
-      <div className="px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3">
-        <button
-          className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all md:hidden"
-          onClick={onBack}
-        >
-          ←
-        </button>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3">
+        <motion.button whileTap={{ scale: 0.85 }} className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all md:hidden" onClick={onBack}>←</motion.button>
         <div className="flex-1">
           <h2 className="font-display text-2xl font-bold">Communautés</h2>
           <p className="text-xs text-envle-text-muted">{communities.filter((c) => c.isJoined).length} communautés rejointes</p>
         </div>
-        <button
-          className="px-4 py-2 rounded-xl border-none font-body text-sm cursor-pointer font-semibold text-primary-foreground transition-all hover:-translate-y-0.5"
-          style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }}
-          onClick={() => toast("🌍 Créer une communauté — Bientôt disponible")}
-        >
-          + Créer
-        </button>
-      </div>
+        <motion.button whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05, y: -1 }} className="px-4 py-2 rounded-xl border-none font-body text-sm cursor-pointer font-semibold text-primary-foreground transition-all" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={() => toast("🌍 Créer une communauté — Bientôt disponible")}>+ Créer</motion.button>
+      </motion.div>
 
-      {/* Categories */}
       <div className="flex px-6 gap-2 py-3 overflow-x-auto border-b border-envle-border" style={{ scrollbarWidth: "none" }}>
-        {categories.map((cat) => (
-          <motion.button
-            key={cat}
-            whileTap={{ scale: 0.95 }}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer border-none transition-all whitespace-nowrap ${
-              activeCat === cat
-                ? "bg-primary/20 text-envle-vert-light"
-                : "bg-foreground/[0.04] text-envle-text-muted"
-            }`}
-            onClick={() => setActiveCat(cat)}
-          >
-            {cat}
-          </motion.button>
+        {categories.map((cat, i) => (
+          <motion.button key={cat} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} whileTap={{ scale: 0.92 }} whileHover={{ y: -1 }} className={`px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer border-none transition-all whitespace-nowrap ${activeCat === cat ? "bg-primary/20 text-envle-vert-light" : "bg-foreground/[0.04] text-envle-text-muted"}`} onClick={() => setActiveCat(cat)}>{cat}</motion.button>
         ))}
       </div>
 
-      {/* Communities list */}
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <AnimatePresence>
+        <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <AnimatePresence mode="popLayout">
             {filtered.map((community, i) => (
               <motion.div
                 key={community.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ delay: i * 0.05 }}
-                className="bg-envle-card border border-envle-border rounded-2xl overflow-hidden group hover:border-primary/30 transition-all cursor-pointer"
+                layout
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ delay: i * 0.05, type: "spring", stiffness: 300, damping: 25 }}
+                whileHover={{ y: -4, scale: 1.01 }}
+                className="bg-envle-card border border-envle-border rounded-2xl overflow-hidden group hover:border-primary/30 transition-all cursor-pointer hover:shadow-[0_8px_30px_hsla(142,47%,33%,0.1)]"
                 onClick={() => setSelectedCommunity(community)}
               >
-                {/* Banner */}
-                <div
-                  className="h-24 relative flex items-center justify-center text-4xl"
-                  style={{ background: community.bgStyle }}
-                >
-                  {community.icon}
+                <div className="h-24 relative flex items-center justify-center text-4xl overflow-hidden" style={{ background: community.bgStyle }}>
+                  <motion.span className="group-hover:scale-110 transition-transform duration-500">{community.icon}</motion.span>
                   {community.isJoined && (
-                    <span className="absolute top-2 right-2 bg-primary/80 text-[10px] font-bold px-2 py-0.5 rounded-full text-primary-foreground">
-                      Membre
-                    </span>
+                    <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute top-2 right-2 bg-primary/80 text-[10px] font-bold px-2 py-0.5 rounded-full text-primary-foreground">Membre</motion.span>
                   )}
                 </div>
                 <div className="p-4">
@@ -123,17 +90,13 @@ const CommunityModule = ({ onBack }: { onBack: () => void }) => {
                       <span>📝 {community.posts}</span>
                     </div>
                     <motion.button
-                      whileTap={{ scale: 0.9 }}
+                      whileTap={{ scale: 0.88 }}
+                      whileHover={{ scale: 1.05 }}
                       className={`px-4 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-all ${
-                        community.isJoined
-                          ? "bg-transparent border-envle-border text-envle-text-muted hover:border-envle-rouge hover:text-envle-rouge"
-                          : "border-transparent text-primary-foreground"
+                        community.isJoined ? "bg-transparent border-envle-border text-envle-text-muted hover:border-envle-rouge hover:text-envle-rouge" : "border-transparent text-primary-foreground"
                       }`}
                       style={!community.isJoined ? { background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" } : undefined}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleJoin(community.id);
-                      }}
+                      onClick={(e) => { e.stopPropagation(); toggleJoin(community.id); }}
                     >
                       {community.isJoined ? "Quitter" : "Rejoindre"}
                     </motion.button>
@@ -142,37 +105,24 @@ const CommunityModule = ({ onBack }: { onBack: () => void }) => {
               </motion.div>
             ))}
           </AnimatePresence>
-        </div>
+        </motion.div>
       </div>
 
       {/* Community detail overlay */}
       <AnimatePresence>
         {selectedCommunity && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center"
-            onClick={() => setSelectedCommunity(null)}
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center" onClick={() => setSelectedCommunity(null)}>
             <motion.div
-              initial={{ scale: 0.9, y: 20 }}
+              initial={{ scale: 0.85, y: 30 }}
               animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
+              exit={{ scale: 0.85, y: 30 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
               className="bg-envle-card border border-envle-border rounded-3xl w-[480px] max-w-[95vw] max-h-[85vh] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              <div
-                className="h-32 relative flex items-center justify-center text-5xl"
-                style={{ background: selectedCommunity.bgStyle }}
-              >
+              <div className="h-32 relative flex items-center justify-center text-5xl" style={{ background: selectedCommunity.bgStyle }}>
                 {selectedCommunity.icon}
-                <button
-                  className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm border-none text-white cursor-pointer flex items-center justify-center"
-                  onClick={() => setSelectedCommunity(null)}
-                >
-                  ✕
-                </button>
+                <motion.button whileTap={{ scale: 0.8 }} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm border-none text-white cursor-pointer flex items-center justify-center" onClick={() => setSelectedCommunity(null)}>✕</motion.button>
               </div>
               <div className="p-6">
                 <h3 className="text-xl font-bold mb-1">{selectedCommunity.name}</h3>
@@ -182,14 +132,12 @@ const CommunityModule = ({ onBack }: { onBack: () => void }) => {
                   <span>📝 {selectedCommunity.posts} publications</span>
                   <span>⏰ {selectedCommunity.lastActivity}</span>
                 </div>
-
-                {/* Mock posts */}
                 <h4 className="text-sm font-bold mb-3">Publications récentes</h4>
                 {[
                   { user: "Amadou K.", text: "Qui participe au hackathon de ce week-end? 🚀", time: "Il y a 5 min", likes: 24 },
                   { user: "Mariam D.", text: "Nouveau tutoriel React disponible sur ma chaîne 📺", time: "Il y a 1h", likes: 56 },
                 ].map((post, i) => (
-                  <div key={i} className="bg-foreground/[0.04] rounded-xl p-3 mb-2">
+                  <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + i * 0.1 }} className="bg-foreground/[0.04] rounded-xl p-3 mb-2">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">{post.user[0]}</div>
                       <span className="text-sm font-semibold">{post.user}</span>
@@ -197,11 +145,11 @@ const CommunityModule = ({ onBack }: { onBack: () => void }) => {
                     </div>
                     <p className="text-sm mb-2">{post.text}</p>
                     <div className="flex items-center gap-4 text-xs text-envle-text-muted">
-                      <span>❤️ {post.likes}</span>
-                      <span>💬 Commenter</span>
-                      <span>↗ Partager</span>
+                      <motion.span whileTap={{ scale: 1.3 }} className="cursor-pointer">❤️ {post.likes}</motion.span>
+                      <motion.span whileTap={{ scale: 1.1 }} className="cursor-pointer">💬 Commenter</motion.span>
+                      <motion.span whileTap={{ scale: 1.1 }} className="cursor-pointer">↗ Partager</motion.span>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </motion.div>

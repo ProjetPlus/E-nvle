@@ -35,35 +35,92 @@ const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall, onOpenNotific
 
   const sidebarContent = (
     <nav className="w-[72px] bg-envle-noir border-r border-envle-border flex flex-col items-center py-5 gap-2 z-[100] h-full">
-      <motion.div whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }} className="w-11 h-11 rounded-[14px] overflow-hidden mb-4 cursor-pointer" onClick={() => toast("🌍 E'nvlé — Super App Africaine")}>
+      <motion.div
+        whileHover={{ scale: 1.12, rotate: 3 }}
+        whileTap={{ scale: 0.9 }}
+        className="w-11 h-11 rounded-[14px] overflow-hidden mb-4 cursor-pointer"
+        onClick={() => toast("🌍 E'nvlé — Super App Africaine")}
+      >
         <img src={envleLogo} alt="E'nvlé" className="w-full h-full object-cover" />
       </motion.div>
 
       <div className="w-10 h-px bg-envle-border my-2" />
 
-      {navItems.map((item) => (
-        <motion.button key={item.id} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.9 }} className={`w-12 h-12 rounded-[14px] border-none text-[22px] cursor-pointer transition-colors flex items-center justify-center relative ${activeNav === item.id ? "bg-primary/20 text-envle-vert-light" : "bg-transparent text-envle-text-muted hover:bg-envle-card hover:text-foreground"}`} onClick={() => handleNav(item.id)} title={item.label}>
-          {activeNav === item.id && <motion.span layoutId="nav-indicator" className="absolute left-[-8px] top-1/2 -translate-y-1/2 w-1 h-7 bg-primary rounded-r" />}
+      {navItems.map((item, i) => (
+        <motion.button
+          key={item.id}
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: i * 0.04, type: "spring", stiffness: 300, damping: 20 }}
+          whileHover={{ scale: 1.1, y: -2 }}
+          whileTap={{ scale: 0.88 }}
+          className={`w-12 h-12 rounded-[14px] border-none text-[22px] cursor-pointer transition-colors flex items-center justify-center relative ${activeNav === item.id ? "bg-primary/20 text-envle-vert-light" : "bg-transparent text-envle-text-muted hover:bg-envle-card hover:text-foreground"}`}
+          onClick={() => handleNav(item.id)}
+          title={item.label}
+        >
+          {activeNav === item.id && <motion.span layoutId="nav-indicator" className="absolute left-[-8px] top-1/2 -translate-y-1/2 w-1 h-7 bg-primary rounded-r" transition={{ type: "spring", stiffness: 500, damping: 30 }} />}
           {item.icon}
-          {item.badge && <span className="absolute top-1.5 right-1.5 w-[18px] h-[18px] rounded-full bg-envle-rouge text-[10px] font-bold flex items-center justify-center text-foreground">{item.badge}</span>}
+          {item.badge && (
+            <motion.span
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 500, damping: 15 }}
+              className="absolute top-1.5 right-1.5 w-[18px] h-[18px] rounded-full bg-envle-rouge text-[10px] font-bold flex items-center justify-center text-foreground"
+            >
+              {item.badge}
+            </motion.span>
+          )}
         </motion.button>
       ))}
 
-      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.9 }} className="w-12 h-12 rounded-[14px] border-none text-[22px] cursor-pointer transition-colors flex items-center justify-center bg-transparent text-envle-text-muted hover:bg-envle-card hover:text-foreground" onClick={onOpenCall} title="Réunions (50 pers.)">📹</motion.button>
+      <motion.button whileHover={{ scale: 1.1, y: -2 }} whileTap={{ scale: 0.88 }} className="w-12 h-12 rounded-[14px] border-none text-[22px] cursor-pointer transition-colors flex items-center justify-center bg-transparent text-envle-text-muted hover:bg-envle-card hover:text-foreground" onClick={onOpenCall} title="Réunions (50 pers.)">📹</motion.button>
 
       <div className="flex-1" />
 
       {/* Notifications */}
-      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.9 }} className="w-12 h-12 rounded-[14px] border-none text-[22px] cursor-pointer transition-colors flex items-center justify-center bg-transparent text-envle-text-muted hover:bg-envle-card hover:text-foreground relative" onClick={onOpenNotifications} title="Notifications">
+      <motion.button whileHover={{ scale: 1.1, y: -2 }} whileTap={{ scale: 0.88 }} className="w-12 h-12 rounded-[14px] border-none text-[22px] cursor-pointer transition-colors flex items-center justify-center bg-transparent text-envle-text-muted hover:bg-envle-card hover:text-foreground relative" onClick={onOpenNotifications} title="Notifications">
         🔔
-        {unreadNotifications > 0 && <span className="absolute top-1.5 right-1.5 w-[18px] h-[18px] rounded-full bg-envle-rouge text-[10px] font-bold flex items-center justify-center text-foreground">{unreadNotifications}</span>}
+        {unreadNotifications > 0 && (
+          <motion.span
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 500, damping: 15 }}
+            className="absolute top-1.5 right-1.5 w-[18px] h-[18px] rounded-full bg-envle-rouge text-[10px] font-bold flex items-center justify-center text-foreground"
+          >
+            {unreadNotifications}
+          </motion.span>
+        )}
       </motion.button>
 
-      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.9, rotate: 180 }} className="w-12 h-12 rounded-[14px] border-none text-[22px] cursor-pointer transition-colors flex items-center justify-center bg-transparent text-envle-text-muted hover:bg-envle-card hover:text-foreground" onClick={toggleTheme} title={theme === "dark" ? "Mode clair" : "Mode sombre"}>{theme === "dark" ? "☀️" : "🌙"}</motion.button>
+      <motion.button
+        whileHover={{ scale: 1.1, rotate: 180 }}
+        whileTap={{ scale: 0.88 }}
+        className="w-12 h-12 rounded-[14px] border-none text-[22px] cursor-pointer transition-colors flex items-center justify-center bg-transparent text-envle-text-muted hover:bg-envle-card hover:text-foreground"
+        onClick={toggleTheme}
+        title={theme === "dark" ? "Mode clair" : "Mode sombre"}
+      >
+        {theme === "dark" ? "☀️" : "🌙"}
+      </motion.button>
 
-      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.9 }} className={`w-12 h-12 rounded-[14px] border-none text-[22px] cursor-pointer transition-colors flex items-center justify-center ${activeNav === "settings" ? "bg-primary/20 text-envle-vert-light" : "bg-transparent text-envle-text-muted hover:bg-envle-card hover:text-foreground"}`} onClick={() => handleNav("settings")} title="Paramètres">⚙️</motion.button>
+      <motion.button
+        whileHover={{ scale: 1.1, y: -2 }}
+        whileTap={{ scale: 0.88 }}
+        className={`w-12 h-12 rounded-[14px] border-none text-[22px] cursor-pointer transition-colors flex items-center justify-center ${activeNav === "settings" ? "bg-primary/20 text-envle-vert-light" : "bg-transparent text-envle-text-muted hover:bg-envle-card hover:text-foreground"}`}
+        onClick={() => handleNav("settings")}
+        title="Paramètres"
+      >
+        <motion.span animate={activeNav === "settings" ? { rotate: 90 } : { rotate: 0 }} transition={{ type: "spring", stiffness: 200 }}>⚙️</motion.span>
+      </motion.button>
 
-      <motion.div whileHover={{ scale: 1.08 }} className="w-[42px] h-[42px] rounded-full border-2 border-primary cursor-pointer flex items-center justify-center font-bold text-base text-foreground mt-2" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))" }} onClick={onOpenAuth}>KD</motion.div>
+      <motion.div
+        whileHover={{ scale: 1.12, rotate: -3 }}
+        whileTap={{ scale: 0.9 }}
+        className="w-[42px] h-[42px] rounded-full border-2 border-primary cursor-pointer flex items-center justify-center font-bold text-base text-foreground mt-2"
+        style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))" }}
+        onClick={onOpenAuth}
+      >
+        KD
+      </motion.div>
     </nav>
   );
 
