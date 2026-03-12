@@ -44,7 +44,7 @@ interface Props {
 
 const msgVariants = {
   initial: { opacity: 0, y: 12, scale: 0.95 },
-  animate: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 400, damping: 25 } },
+  animate: { opacity: 1, y: 0, scale: 1, transition: { type: "spring" as const, stiffness: 400, damping: 25 } },
   exit: { opacity: 0, scale: 0.9, transition: { duration: 0.15 } },
 };
 

@@ -7,7 +7,7 @@ const stagger = {
 };
 const fadeUp = {
   initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
+  animate: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } },
 };
 
 const RightPanel = ({ conv, onOpenCall }: { conv: Conversation; onOpenCall: (type: string) => void }) => {

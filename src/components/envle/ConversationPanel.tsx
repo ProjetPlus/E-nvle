@@ -46,7 +46,7 @@ const staggerContainer = {
 
 const staggerItem = {
   initial: { opacity: 0, x: -20, scale: 0.98 },
-  animate: { opacity: 1, x: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 24 } },
+  animate: { opacity: 1, x: 0, scale: 1, transition: { type: "spring" as const, stiffness: 300, damping: 24 } },
 };
 
 const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
