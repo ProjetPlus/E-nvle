@@ -12,16 +12,7 @@ export interface Notification {
   icon: string;
 }
 
-const mockNotifications: Notification[] = [
-  { id: "1", type: "message", title: "Amara Diallo", body: "T'a envoyé une photo 📷", time: "Il y a 2 min", read: false, icon: "💬" },
-  { id: "2", type: "call", title: "Appel manqué", body: "Kofi Mensah · Appel audio", time: "Il y a 15 min", read: false, icon: "📵" },
-  { id: "3", type: "payment", title: "Paiement reçu", body: "+25 000 FCFA de Fatima Traoré", time: "Il y a 1h", read: false, icon: "💰" },
-  { id: "4", type: "social", title: "Nouvelle réaction", body: "Boubacar a aimé votre story", time: "Il y a 2h", read: true, icon: "❤️" },
-  { id: "5", type: "job", title: "Candidature vue", body: "TechHub Dakar a consulté votre profil", time: "Il y a 3h", read: true, icon: "👀" },
-  { id: "6", type: "system", title: "Mise à jour E'nvlé", body: "v2.5 disponible · Nouvelles fonctionnalités", time: "Il y a 5h", read: true, icon: "🚀" },
-  { id: "7", type: "payment", title: "Achat confirmé", body: "Tissu Wax Premium · 15 000 FCFA", time: "Hier", read: true, icon: "🛍️" },
-  { id: "8", type: "social", title: "Nouveau membre", body: "Diaspora Africa · +3 membres", time: "Hier", read: true, icon: "👥" },
-];
+// No mock data — notifications come from Supabase
 
 interface Props {
   open: boolean;
