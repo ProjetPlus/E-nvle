@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "@/hooks/use-theme";
-import envleLogo from "@/assets/envle-logo.jpg";
+import envleLogo from "@/assets/envle-logo.png";
 
 interface SidebarProps {
   activeNav: string;
@@ -12,20 +12,21 @@ interface SidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
   unreadNotifications?: number;
+  userInitials?: string;
 }
 
 const navItems = [
-  { id: "chat", icon: "💬", label: "Messages", badge: 5 },
+  { id: "chat", icon: "💬", label: "Messages" },
   { id: "calls", icon: "📞", label: "Appels" },
   { id: "stories", icon: "✨", label: "Stories & Reels" },
   { id: "community", icon: "👥", label: "Communautés" },
-  { id: "shop", icon: "🛍️", label: "Boutique & Commerce", badge: 2 },
+  { id: "shop", icon: "🛍️", label: "Boutique & Commerce" },
   { id: "wallet", icon: "💰", label: "Portefeuille" },
   { id: "jobs", icon: "💼", label: "Emplois & Pages Pro" },
   { id: "map", icon: "🗺️", label: "Carte & Localisation" },
 ];
 
-const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall, onOpenNotifications, isOpen, onClose, unreadNotifications = 0 }: SidebarProps) => {
+const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall, onOpenNotifications, isOpen, onClose, unreadNotifications = 0, userInitials = "?" }: SidebarProps) => {
   const { theme, toggleTheme } = useTheme();
 
   const handleNav = (id: string) => {
@@ -38,10 +39,10 @@ const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall, onOpenNotific
       <motion.div
         whileHover={{ scale: 1.12, rotate: 3 }}
         whileTap={{ scale: 0.9 }}
-        className="w-11 h-11 rounded-[14px] overflow-hidden mb-4 cursor-pointer"
-        onClick={() => toast("🌍 E'nvlé — Super App Africaine")}
+        className="w-11 h-11 overflow-hidden mb-4 cursor-pointer"
+        onClick={() => toast("🌍 E'nvlé — Connecter. Créer. Célébrer.")}
       >
-        <img src={envleLogo} alt="E'nvlé" className="w-full h-full object-cover" />
+        <img src={envleLogo} alt="E'nvlé" className="w-full h-full object-contain" />
       </motion.div>
 
       <div className="w-10 h-px bg-envle-border my-2" />
@@ -60,16 +61,6 @@ const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall, onOpenNotific
         >
           {activeNav === item.id && <motion.span layoutId="nav-indicator" className="absolute left-[-8px] top-1/2 -translate-y-1/2 w-1 h-7 bg-primary rounded-r" transition={{ type: "spring", stiffness: 500, damping: 30 }} />}
           {item.icon}
-          {item.badge && (
-            <motion.span
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 500, damping: 15 }}
-              className="absolute top-1.5 right-1.5 w-[18px] h-[18px] rounded-full bg-envle-rouge text-[10px] font-bold flex items-center justify-center text-foreground"
-            >
-              {item.badge}
-            </motion.span>
-          )}
         </motion.button>
       ))}
 
@@ -77,7 +68,6 @@ const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall, onOpenNotific
 
       <div className="flex-1" />
 
-      {/* Notifications */}
       <motion.button whileHover={{ scale: 1.1, y: -2 }} whileTap={{ scale: 0.88 }} className="w-12 h-12 rounded-[14px] border-none text-[22px] cursor-pointer transition-colors flex items-center justify-center bg-transparent text-envle-text-muted hover:bg-envle-card hover:text-foreground relative" onClick={onOpenNotifications} title="Notifications">
         🔔
         {unreadNotifications > 0 && (
@@ -119,7 +109,7 @@ const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall, onOpenNotific
         style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))" }}
         onClick={onOpenAuth}
       >
-        KD
+        {userInitials}
       </motion.div>
     </nav>
   );
