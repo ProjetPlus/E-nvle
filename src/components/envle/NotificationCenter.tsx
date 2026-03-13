@@ -96,4 +96,3 @@ const NotificationCenter = ({ open, onClose, notifications, onMarkAllRead, onCle
 };
 
 export default NotificationCenter;
-export { mockNotifications };
