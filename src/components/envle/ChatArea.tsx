@@ -19,22 +19,10 @@ interface Message {
   senderLang?: string;
 }
 
-const initialMessages: Message[] = [
-  { id: "1", text: "Salut! Tu as vu la dernière mise à jour de E'nvlé? 🚀", sent: false, time: "09:30", senderLang: "fr" },
-  { id: "2", text: "Oui! Le nouveau module commerce est 🔥 J'ai déjà créé ma boutique", sent: true, time: "09:32" },
-  { id: "3", text: "Regarde ce tissu wax que j'ai trouvé!", sent: false, time: "09:35", isImage: true, senderLang: "fr" },
-  { id: "4", text: "Magnifique 😍 tu l'as commandé via la boutique?", sent: true, time: "09:36" },
-  { id: "5", text: "", sent: false, time: "09:40", isVoice: true },
-  { id: "6", text: "Ok je regarde ça maintenant 🙏 Je t'envoie le reçu IA généré automatiquement dès que c'est fait!", sent: true, time: "09:42" },
-];
+// No test data — messages come from Supabase
+const initialMessages: Message[] = [];
 
-const replies = [
-  "Merci! Je regarde ça 🙏",
-  "Super 👍 Tu m'envoies le lien?",
-  "Parfait, je te confirme demain!",
-  "Ok 😊 E'nvlé c'est vraiment pratique!",
-  "Reçu ✅ Je traite ta demande",
-];
+const replies: string[] = [];
 
 interface Props {
   conv: Conversation;

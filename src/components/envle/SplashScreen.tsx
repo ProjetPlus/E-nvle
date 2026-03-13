@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import envleLogo from "@/assets/envle-logo.jpg";
+import envleLogo from "@/assets/envle-logo.png";
 
 const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
   const [hiding, setHiding] = useState(false);
@@ -29,12 +29,12 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
         <motion.img
           src={envleLogo}
           alt="E'nvlé Logo"
-          className="w-[140px] h-[140px] object-contain rounded-[28px]"
+          className="w-[160px] h-[160px] object-contain"
           animate={{
-            boxShadow: [
-              "0 0 60px hsla(142, 47%, 33%, 0.5), 0 0 120px hsla(37, 90%, 58%, 0.2)",
-              "0 0 80px hsla(142, 47%, 33%, 0.8), 0 0 160px hsla(37, 90%, 58%, 0.4)",
-              "0 0 60px hsla(142, 47%, 33%, 0.5), 0 0 120px hsla(37, 90%, 58%, 0.2)",
+            filter: [
+              "drop-shadow(0 0 30px hsla(142, 47%, 33%, 0.5))",
+              "drop-shadow(0 0 50px hsla(142, 47%, 33%, 0.8))",
+              "drop-shadow(0 0 30px hsla(142, 47%, 33%, 0.5))",
             ],
           }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -45,7 +45,7 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
           transition={{ delay: 0.4, duration: 0.6 }}
           className="text-envle-text-muted text-sm tracking-[3px] uppercase -mt-2"
         >
-          Connecté · Créé · Célébré
+          Connecter · Créer · Célébrer
         </motion.p>
         <motion.div
           initial={{ opacity: 0 }}

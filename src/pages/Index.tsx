@@ -17,9 +17,10 @@ import MapModule from "@/components/envle/MapModule";
 import WalletModule from "@/components/envle/WalletModule";
 import SettingsModule from "@/components/envle/SettingsModule";
 import type { UserProfile } from "@/components/envle/SettingsModule";
-import NotificationCenter, { mockNotifications, type Notification } from "@/components/envle/NotificationCenter";
+import NotificationCenter, { type Notification } from "@/components/envle/NotificationCenter";
 import CreateBusinessModal from "@/components/envle/CreateBusinessModal";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/hooks/use-auth";
 
 const pageTransition = {
   initial: { opacity: 0, x: 20, scale: 0.98 },
@@ -28,44 +29,45 @@ const pageTransition = {
   transition: { duration: 0.25, type: "spring" as const, stiffness: 300, damping: 30 },
 };
 
-const defaultConv: Conversation = {
-  id: "1",
-  name: "Amara Diallo",
-  lastMsg: "✓✓ Ok je regarde ça maintenant 🙏",
-  time: "09:42",
-  unread: 3,
-  avatar: "A",
-  avatarStyle: "linear-gradient(135deg,#7c3aed,#ec4899)",
-  isOnline: true,
-  status: "Architecte à Abidjan",
+const emptyConv: Conversation = {
+  id: "",
+  name: "Sélectionnez une conversation",
+  lastMsg: "",
+  time: "",
+  avatar: "💬",
+  avatarStyle: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))",
+  status: "",
 };
 
 const defaultProfile: UserProfile = {
-  name: "Kouamé Diallo",
-  phone: "+225 07 12 34 56",
-  email: "kouame@envle.app",
-  bio: "Passionné de tech africaine 🌍",
-  avatar: "KD",
+  name: "",
+  phone: "",
+  email: "",
+  bio: "",
+  avatar: "?",
   avatarStyle: "linear-gradient(135deg, hsl(142 47% 23%), hsl(142 47% 33%))",
-  location: "Abidjan, Côte d'Ivoire",
-  profession: "Développeur Full-Stack",
+  location: "",
+  profession: "",
 };
 
 const Index = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [appVisible, setAppVisible] = useState(false);
   const [activeNav, setActiveNav] = useState("chat");
-  const [activeConv, setActiveConv] = useState<Conversation>(defaultConv);
+  const [activeConv, setActiveConv] = useState<Conversation>(emptyConv);
   const [authOpen, setAuthOpen] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
   const [callType, setCallType] = useState("video");
   const [mobileView, setMobileView] = useState<"list" | "chat">("list");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile>(defaultProfile);
   const [createModal, setCreateModal] = useState<{ open: boolean; type: "business" | "job" | "product" }>({ open: false, type: "business" });
   const isMobile = useIsMobile();
+  const { user } = useAuth();
+
+  const userInitials = user?.email ? user.email.substring(0, 2).toUpperCase() : "?";
 
   const handleSplashFinish = useCallback(() => {
     setShowSplash(false);
@@ -135,6 +137,7 @@ const Index = () => {
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           unreadNotifications={unreadCount}
+          userInitials={userInitials}
         />
 
         {isMobile && appVisible && (
