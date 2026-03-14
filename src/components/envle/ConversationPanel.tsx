@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 
 export interface Conversation {
   id: string;
@@ -34,9 +36,120 @@ interface Props {
 const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
   const [activeTab, setActiveTab] = useState("Tous");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
-  // No test data — conversations will come from Supabase
-  const conversations: Conversation[] = [];
+  // Load conversations from Supabase
+  useEffect(() => {
+    if (!user) {
+      setConversations([]);
+      setLoading(false);
+      return;
+    }
+
+    const fetchConversations = async () => {
+      setLoading(true);
+
+      // Get conversation IDs user is a member of
+      const { data: memberships } = await supabase
+        .from("conversation_members")
+        .select("conversation_id")
+        .eq("user_id", user.id);
+
+      if (!memberships || memberships.length === 0) {
+        setConversations([]);
+        setLoading(false);
+        return;
+      }
+
+      const convIds = memberships.map((m) => m.conversation_id);
+
+      const { data: convData } = await supabase
+        .from("conversations")
+        .select("*")
+        .in("id", convIds)
+        .order("updated_at", { ascending: false });
+
+      if (convData) {
+        // Get last message for each conversation
+        const convList: Conversation[] = await Promise.all(
+          convData.map(async (c) => {
+            const { data: lastMsgs } = await supabase
+              .from("messages")
+              .select("content, created_at")
+              .eq("conversation_id", c.id)
+              .order("created_at", { ascending: false })
+              .limit(1);
+
+            const { count } = await supabase
+              .from("messages")
+              .select("*", { count: "exact", head: true })
+              .eq("conversation_id", c.id)
+              .eq("is_read", false)
+              .neq("sender_id", user.id);
+
+            const lastMsg = lastMsgs?.[0];
+            const time = lastMsg?.created_at
+              ? new Date(lastMsg.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+              : "";
+
+            return {
+              id: c.id,
+              name: c.name || "Conversation",
+              lastMsg: lastMsg?.content || "",
+              time,
+              unread: count && count > 0 ? count : undefined,
+              avatar: c.name?.charAt(0)?.toUpperCase() || "💬",
+              avatarStyle: c.avatar_style || "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))",
+              isOnline: false,
+              isSquare: c.is_group || false,
+              status: "",
+            };
+          })
+        );
+        setConversations(convList);
+      }
+      setLoading(false);
+    };
+
+    fetchConversations();
+
+    // Realtime subscription for conversations updates
+    const channel = supabase
+      .channel("conversations-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "messages" },
+        () => {
+          // Refresh conversations on new messages
+          fetchConversations();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "conversations" },
+        () => {
+          fetchConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  const filtered = conversations.filter((c) => {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!c.name.toLowerCase().includes(q) && !c.lastMsg.toLowerCase().includes(q)) return false;
+    }
+    if (activeTab === "Non lus") return (c.unread ?? 0) > 0;
+    if (activeTab === "Groupes") return c.isSquare;
+    return true;
+  });
 
   return (
     <div className="w-[340px] bg-envle-card border-r border-envle-border flex flex-col overflow-hidden max-lg:w-[280px] max-md:w-full max-md:border-r-0">
@@ -56,6 +169,8 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
           type="text"
           placeholder="Chercher ou démarrer une conv..."
           className="bg-transparent border-none outline-none text-foreground font-body text-sm flex-1 placeholder:text-envle-text-muted"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
           onFocus={() => setSearchFocused(true)}
           onBlur={() => setSearchFocused(false)}
         />
@@ -84,7 +199,12 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
 
       {/* Conversations */}
       <motion.div variants={staggerContainer} initial="initial" animate="animate" className="flex-1 overflow-y-auto px-2 pb-5 scrollbar-thin">
-        {conversations.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <motion.span animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="text-3xl">⏳</motion.span>
+            <p className="text-envle-text-muted text-xs mt-2">Chargement...</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -92,10 +212,12 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
           >
             <span className="text-5xl mb-4">💬</span>
             <p className="text-envle-text-muted text-sm">Aucune conversation</p>
-            <p className="text-envle-text-muted text-xs mt-1">Connectez-vous pour commencer à discuter</p>
+            <p className="text-envle-text-muted text-xs mt-1">
+              {user ? "Démarrez une nouvelle conversation" : "Connectez-vous pour commencer à discuter"}
+            </p>
           </motion.div>
         ) : (
-          conversations.map((conv) => (
+          filtered.map((conv) => (
             <motion.div
               key={conv.id}
               variants={staggerItem}
