@@ -1,10 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import type { Conversation } from "./ConversationPanel";
 import FileAttachment, { type FileAttachmentData, formatSize } from "./FileAttachment";
 import FileViewer from "./FileViewer";
 import { getTranslatedText } from "@/lib/translator";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 
 interface Message {
   id: string;
@@ -16,13 +18,12 @@ interface Message {
   isImage?: boolean;
   isTyping?: boolean;
   files?: FileAttachmentData[];
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  messageType?: string;
   senderLang?: string;
 }
-
-// No test data — messages come from Supabase
-const initialMessages: Message[] = [];
-
-const replies: string[] = [];
 
 interface Props {
   conv: Conversation;
@@ -37,44 +38,185 @@ const msgVariants = {
 };
 
 const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [attachOpen, setAttachOpen] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<FileAttachmentData[]>([]);
   const [viewingFile, setViewingFile] = useState<FileAttachmentData | null>(null);
   const [showTranslation, setShowTranslation] = useState<Record<string, boolean>>({});
   const [inputFocused, setInputFocused] = useState(false);
+  const [sending, setSending] = useState(false);
   const areaRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     if (areaRef.current) areaRef.current.scrollTop = areaRef.current.scrollHeight;
   }, [messages]);
 
-  const sendMessage = () => {
+  // Load messages from Supabase
+  useEffect(() => {
+    if (!conv.id || !user) {
+      setMessages([]);
+      return;
+    }
+
+    const fetchMessages = async () => {
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", conv.id)
+        .order("created_at", { ascending: true })
+        .limit(100);
+
+      if (data) {
+        setMessages(
+          data.map((m) => ({
+            id: m.id,
+            text: m.content || "",
+            sent: m.sender_id === user.id,
+            time: m.created_at
+              ? new Date(m.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+              : "",
+            fileUrl: m.file_url || undefined,
+            fileName: m.file_name || undefined,
+            fileSize: m.file_size ? Number(m.file_size) : undefined,
+            messageType: m.message_type || "text",
+          }))
+        );
+
+        // Mark messages as read
+        await supabase
+          .from("messages")
+          .update({ is_read: true })
+          .eq("conversation_id", conv.id)
+          .neq("sender_id", user.id)
+          .eq("is_read", false);
+      }
+    };
+
+    fetchMessages();
+
+    // Realtime subscription
+    const channel = supabase
+      .channel(`messages-${conv.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conv.id}` },
+        (payload) => {
+          const m = payload.new as any;
+          setMessages((prev) => {
+            if (prev.some((msg) => msg.id === m.id)) return prev;
+            return [
+              ...prev,
+              {
+                id: m.id,
+                text: m.content || "",
+                sent: m.sender_id === user.id,
+                time: m.created_at
+                  ? new Date(m.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+                  : "",
+                fileUrl: m.file_url || undefined,
+                fileName: m.file_name || undefined,
+                fileSize: m.file_size ? Number(m.file_size) : undefined,
+                messageType: m.message_type || "text",
+              },
+            ];
+          });
+
+          // Mark as read if from other user
+          if (m.sender_id !== user.id) {
+            supabase.from("messages").update({ is_read: true }).eq("id", m.id).then(() => {});
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [conv.id, user]);
+
+  const uploadFileToStorage = useCallback(
+    async (file: File): Promise<{ url: string; name: string; size: number } | null> => {
+      const ext = file.name.split(".").pop() || "bin";
+      const path = `${user!.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const bucket = file.type.startsWith("image/") || file.type.startsWith("video/") ? "media" : "files";
+
+      const { error } = await supabase.storage.from(bucket).upload(path, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+      if (error) {
+        toast.error(`❌ Erreur upload: ${error.message}`);
+        return null;
+      }
+
+      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
+      return { url: urlData.publicUrl, name: file.name, size: file.size };
+    },
+    [user]
+  );
+
+  const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (!text && pendingFiles.length === 0) return;
-    const now = new Date();
-    const time = `${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`;
-    const newMsg: Message = { id: Date.now().toString(), text, sent: true, time, files: pendingFiles.length > 0 ? [...pendingFiles] : undefined };
-    setMessages((prev) => [...prev, newMsg]);
+    if (!user || !conv.id) {
+      toast.error("Connectez-vous pour envoyer des messages");
+      return;
+    }
+
+    setSending(true);
     setInput("");
+    const filesToSend = [...pendingFiles];
     setPendingFiles([]);
 
-    setTimeout(() => {
-      const typingId = `typing-${Date.now()}`;
-      setMessages((prev) => [...prev, { id: typingId, text: "", sent: false, time: "", isTyping: true }]);
-      setTimeout(() => {
-        const reply = replies[Math.floor(Math.random() * replies.length)];
-        setMessages((prev) => [
-          ...prev.filter((m) => m.id !== typingId),
-          { id: `reply-${Date.now()}`, text: reply, sent: false, time, senderLang: "fr" },
-        ]);
-      }, 2000);
-    }, 1500);
-  };
+    try {
+      // Upload files first
+      if (filesToSend.length > 0) {
+        for (const fileData of filesToSend) {
+          const uploaded = await uploadFileToStorage(fileData.file);
+          if (uploaded) {
+            await supabase.from("messages").insert({
+              conversation_id: conv.id,
+              sender_id: user.id,
+              content: fileData.name,
+              message_type: fileData.type.startsWith("image/") ? "image" : "file",
+              file_url: uploaded.url,
+              file_name: uploaded.name,
+              file_size: uploaded.size,
+            });
+          }
+        }
+      }
+
+      // Send text message
+      if (text) {
+        await supabase.from("messages").insert({
+          conversation_id: conv.id,
+          sender_id: user.id,
+          content: text,
+          message_type: "text",
+        });
+      }
+
+      // Update conversation timestamp
+      await supabase
+        .from("conversations")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", conv.id);
+    } catch (err) {
+      toast.error("❌ Erreur d'envoi");
+    } finally {
+      setSending(false);
+    }
+  }, [input, pendingFiles, user, conv.id, uploadFileToStorage]);
 
   const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
   };
 
   const handleFilesSelected = (files: FileAttachmentData[]) => setPendingFiles((prev) => [...prev, ...files]);
@@ -196,7 +338,38 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
                   className={`max-w-[80%] md:max-w-[65%] px-3.5 py-2.5 rounded-[18px] text-sm leading-relaxed ${msg.sent ? "rounded-br-[6px] text-foreground" : "bg-envle-card border border-envle-border rounded-bl-[6px]"}`}
                   style={msg.sent ? { background: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))" } : undefined}
                 >
-                  {msg.isImage && (
+                  {/* Supabase file attachment */}
+                  {msg.fileUrl && (
+                    <div className="mb-1.5">
+                      {msg.messageType === "image" ? (
+                        <motion.img
+                          whileHover={{ scale: 1.03 }}
+                          src={msg.fileUrl}
+                          alt={msg.fileName || "image"}
+                          className="max-w-[240px] max-h-[200px] rounded-xl object-cover cursor-pointer"
+                          onClick={() => window.open(msg.fileUrl, "_blank")}
+                        />
+                      ) : (
+                        <motion.a
+                          whileHover={{ scale: 1.02, x: 2 }}
+                          href={msg.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 bg-foreground/10 rounded-xl px-3 py-2 no-underline text-current"
+                        >
+                          <span className="text-2xl">📁</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold truncate">{msg.fileName || "Fichier"}</div>
+                            {msg.fileSize && <div className="text-[10px] opacity-60">{formatSize(msg.fileSize)}</div>}
+                          </div>
+                          <span className="text-sm opacity-60">📥</span>
+                        </motion.a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Local file attachments (pending display) */}
+                  {msg.isImage && !msg.fileUrl && (
                     <motion.div
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.97 }}
@@ -225,7 +398,8 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
                     </div>
                   ) : (
                     <>
-                      {msg.text && <span>{getDisplayText(msg)}</span>}
+                      {msg.text && !msg.fileUrl && <span>{getDisplayText(msg)}</span>}
+                      {msg.text && msg.fileUrl && msg.messageType === "text" && <span>{getDisplayText(msg)}</span>}
                       {msg.senderLang && !msg.sent && msg.text && (
                         <motion.button whileTap={{ scale: 0.9 }} className="block text-[10px] mt-1 opacity-50 hover:opacity-80 border-none bg-transparent cursor-pointer font-body text-current" onClick={() => toggleTranslation(msg.id)}>
                           {showTranslation[msg.id] ? "🌐 Voir l'original" : "🌐 Traduire"}
@@ -302,11 +476,12 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
         <motion.button
           whileTap={{ scale: 0.85 }}
           whileHover={{ scale: 1.12, rotate: 15 }}
-          className="w-11 h-11 md:w-12 md:h-12 rounded-full border-none text-foreground text-xl cursor-pointer flex items-center justify-center shadow-[0_4px_16px_hsla(142,47%,33%,0.4)]"
+          disabled={sending}
+          className="w-11 h-11 md:w-12 md:h-12 rounded-full border-none text-foreground text-xl cursor-pointer flex items-center justify-center shadow-[0_4px_16px_hsla(142,47%,33%,0.4)] disabled:opacity-50"
           style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }}
           onClick={sendMessage}
         >
-          ➤
+          {sending ? "⏳" : "➤"}
         </motion.button>
       </motion.div>
 
