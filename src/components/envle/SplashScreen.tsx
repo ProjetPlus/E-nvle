@@ -29,7 +29,7 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
         <motion.img
           src={envleLogo}
           alt="E'nvlé Logo"
-          className="w-[160px] h-[160px] object-contain"
+          className="w-[220px] h-[220px] md:w-[260px] md:h-[260px] object-contain"
           animate={{
             filter: [
               "drop-shadow(0 0 30px hsla(142, 47%, 33%, 0.5))",

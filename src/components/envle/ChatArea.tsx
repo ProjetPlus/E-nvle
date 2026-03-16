@@ -37,6 +37,8 @@ const msgVariants = {
   exit: { opacity: 0, scale: 0.9, transition: { duration: 0.15 } },
 };
 
+const EMOJI_LIST = ["😀","😂","🥰","😍","🤩","😎","🤔","😅","😢","😡","🥳","🤗","😇","🙏","👍","👎","❤️","🔥","💯","✨","🎉","🎊","💪","👏","🙌","💀","😤","🥺","😭","😈","👀","💬","📸","🎵","⚡","🌍","🇨🇮","🇸🇳","🇲🇱","🇧🇫","🇬🇳","🇳🇬","🇬🇭","🇹🇬","🇧🇯","🇳🇪"];
+
 const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -46,7 +48,14 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
   const [showTranslation, setShowTranslation] = useState<Record<string, boolean>>({});
   const [inputFocused, setInputFocused] = useState(false);
   const [sending, setSending] = useState(false);
+  const [showEmojis, setShowEmojis] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const areaRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const recordingIntervalRef = useRef<number | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -55,202 +64,164 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
 
   // Load messages from Supabase
   useEffect(() => {
-    if (!conv.id || !user) {
-      setMessages([]);
-      return;
-    }
-
+    if (!conv.id || !user) { setMessages([]); return; }
     const fetchMessages = async () => {
-      const { data } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("conversation_id", conv.id)
-        .order("created_at", { ascending: true })
-        .limit(100);
-
+      const { data } = await supabase.from("messages").select("*").eq("conversation_id", conv.id).order("created_at", { ascending: true }).limit(100);
       if (data) {
-        setMessages(
-          data.map((m) => ({
-            id: m.id,
-            text: m.content || "",
-            sent: m.sender_id === user.id,
-            time: m.created_at
-              ? new Date(m.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
-              : "",
-            fileUrl: m.file_url || undefined,
-            fileName: m.file_name || undefined,
-            fileSize: m.file_size ? Number(m.file_size) : undefined,
-            messageType: m.message_type || "text",
-          }))
-        );
-
-        // Mark messages as read
-        await supabase
-          .from("messages")
-          .update({ is_read: true })
-          .eq("conversation_id", conv.id)
-          .neq("sender_id", user.id)
-          .eq("is_read", false);
+        setMessages(data.map((m) => ({
+          id: m.id, text: m.content || "", sent: m.sender_id === user.id,
+          time: m.created_at ? new Date(m.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "",
+          fileUrl: m.file_url || undefined, fileName: m.file_name || undefined,
+          fileSize: m.file_size ? Number(m.file_size) : undefined, messageType: m.message_type || "text",
+        })));
+        await supabase.from("messages").update({ is_read: true }).eq("conversation_id", conv.id).neq("sender_id", user.id).eq("is_read", false);
       }
     };
-
     fetchMessages();
-
-    // Realtime subscription
     const channel = supabase
       .channel(`messages-${conv.id}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conv.id}` },
-        (payload) => {
-          const m = payload.new as any;
-          setMessages((prev) => {
-            if (prev.some((msg) => msg.id === m.id)) return prev;
-            return [
-              ...prev,
-              {
-                id: m.id,
-                text: m.content || "",
-                sent: m.sender_id === user.id,
-                time: m.created_at
-                  ? new Date(m.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
-                  : "",
-                fileUrl: m.file_url || undefined,
-                fileName: m.file_name || undefined,
-                fileSize: m.file_size ? Number(m.file_size) : undefined,
-                messageType: m.message_type || "text",
-              },
-            ];
-          });
-
-          // Mark as read if from other user
-          if (m.sender_id !== user.id) {
-            supabase.from("messages").update({ is_read: true }).eq("id", m.id).then(() => {});
-          }
-        }
-      )
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conv.id}` }, (payload) => {
+        const m = payload.new as any;
+        setMessages((prev) => {
+          if (prev.some((msg) => msg.id === m.id)) return prev;
+          return [...prev, {
+            id: m.id, text: m.content || "", sent: m.sender_id === user.id,
+            time: m.created_at ? new Date(m.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "",
+            fileUrl: m.file_url || undefined, fileName: m.file_name || undefined,
+            fileSize: m.file_size ? Number(m.file_size) : undefined, messageType: m.message_type || "text",
+          }];
+        });
+        if (m.sender_id !== user.id) supabase.from("messages").update({ is_read: true }).eq("id", m.id).then(() => {});
+      })
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [conv.id, user]);
 
-  const uploadFileToStorage = useCallback(
-    async (file: File): Promise<{ url: string; name: string; size: number } | null> => {
-      const ext = file.name.split(".").pop() || "bin";
-      const path = `${user!.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const bucket = file.type.startsWith("image/") || file.type.startsWith("video/") ? "media" : "files";
-
-      const { error } = await supabase.storage.from(bucket).upload(path, file, {
-        cacheControl: "3600",
-        upsert: false,
-      });
-
-      if (error) {
-        toast.error(`❌ Erreur upload: ${error.message}`);
-        return null;
-      }
-
-      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
-      return { url: urlData.publicUrl, name: file.name, size: file.size };
-    },
-    [user]
-  );
+  const uploadFileToStorage = useCallback(async (file: File) => {
+    const ext = file.name.split(".").pop() || "bin";
+    const path = `${user!.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const bucket = file.type.startsWith("image/") || file.type.startsWith("video/") ? "media" : "files";
+    const { error } = await supabase.storage.from(bucket).upload(path, file, { cacheControl: "3600", upsert: false });
+    if (error) { toast.error(`❌ Erreur upload: ${error.message}`); return null; }
+    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
+    return { url: urlData.publicUrl, name: file.name, size: file.size };
+  }, [user]);
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (!text && pendingFiles.length === 0) return;
-    if (!user || !conv.id) {
-      toast.error("Connectez-vous pour envoyer des messages");
-      return;
-    }
-
+    if (!user || !conv.id) { toast.error("Connectez-vous pour envoyer des messages"); return; }
     setSending(true);
     setInput("");
     const filesToSend = [...pendingFiles];
     setPendingFiles([]);
-
     try {
-      // Upload files first
       if (filesToSend.length > 0) {
         for (const fileData of filesToSend) {
           const uploaded = await uploadFileToStorage(fileData.file);
           if (uploaded) {
             await supabase.from("messages").insert({
-              conversation_id: conv.id,
-              sender_id: user.id,
-              content: fileData.name,
+              conversation_id: conv.id, sender_id: user.id, content: fileData.name,
               message_type: fileData.type.startsWith("image/") ? "image" : "file",
-              file_url: uploaded.url,
-              file_name: uploaded.name,
-              file_size: uploaded.size,
+              file_url: uploaded.url, file_name: uploaded.name, file_size: uploaded.size,
             });
           }
         }
       }
-
-      // Send text message
       if (text) {
-        await supabase.from("messages").insert({
-          conversation_id: conv.id,
-          sender_id: user.id,
-          content: text,
-          message_type: "text",
-        });
+        await supabase.from("messages").insert({ conversation_id: conv.id, sender_id: user.id, content: text, message_type: "text" });
       }
-
-      // Update conversation timestamp
-      await supabase
-        .from("conversations")
-        .update({ updated_at: new Date().toISOString() })
-        .eq("id", conv.id);
-    } catch (err) {
-      toast.error("❌ Erreur d'envoi");
-    } finally {
-      setSending(false);
-    }
+      await supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conv.id);
+    } catch { toast.error("❌ Erreur d'envoi"); } finally { setSending(false); }
   }, [input, pendingFiles, user, conv.id, uploadFileToStorage]);
 
+  // Enter = newline, Shift+Enter or Ctrl+Enter = send
   const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && (e.shiftKey || e.ctrlKey)) {
       e.preventDefault();
       sendMessage();
     }
+    // Enter without shift = default newline behavior (no preventDefault)
+  };
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + "px";
+    }
+  }, [input]);
+
+  // Voice recording - toggle mode
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      recordingChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) recordingChunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(recordingChunksRef.current, { type: "audio/webm" });
+        if (blob.size > 0 && user && conv.id) {
+          const file = new File([blob], `vocal-${Date.now()}.webm`, { type: "audio/webm" });
+          const uploaded = await uploadFileToStorage(file);
+          if (uploaded) {
+            await supabase.from("messages").insert({
+              conversation_id: conv.id, sender_id: user.id, content: "🎤 Message vocal",
+              message_type: "audio", file_url: uploaded.url, file_name: uploaded.name, file_size: uploaded.size,
+            });
+            await supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conv.id);
+            toast.success("🎤 Vocal envoyé!");
+          }
+        }
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      recordingIntervalRef.current = window.setInterval(() => setRecordingTime(t => t + 1), 1000);
+    } catch { toast.error("🎤 Micro non disponible"); }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+    if (recordingIntervalRef.current) { clearInterval(recordingIntervalRef.current); recordingIntervalRef.current = null; }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = () => { mediaRecorderRef.current?.stream?.getTracks().forEach(t => t.stop()); };
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    if (recordingIntervalRef.current) { clearInterval(recordingIntervalRef.current); recordingIntervalRef.current = null; }
+    toast("❌ Vocal annulé");
   };
 
   const handleFilesSelected = (files: FileAttachmentData[]) => setPendingFiles((prev) => [...prev, ...files]);
   const removePendingFile = (id: string) => setPendingFiles((prev) => prev.filter((f) => f.id !== id));
-
-  const downloadFile = (file: FileAttachmentData) => {
-    const url = URL.createObjectURL(file.file);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = file.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success(`📥 ${file.name} téléchargé`);
-  };
 
   const fileIcon = (type: string) => {
     if (type.startsWith("image/")) return "🖼️";
     if (type.startsWith("video/")) return "🎥";
     if (type.startsWith("audio/")) return "🎵";
     if (type.includes("pdf")) return "📄";
-    if (type.includes("zip") || type.includes("rar")) return "📦";
     return "📁";
   };
 
-  const toggleTranslation = (msgId: string) => {
-    setShowTranslation((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
-  };
-
+  const toggleTranslation = (msgId: string) => setShowTranslation((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
   const getDisplayText = (msg: Message) => {
     if (!msg.senderLang || msg.sent) return msg.text;
     if (showTranslation[msg.id]) return getTranslatedText(msg.text, msg.senderLang);
     return msg.text;
+  };
+
+  const insertEmoji = (emoji: string) => {
+    setInput(prev => prev + emoji);
+    setShowEmojis(false);
+    textareaRef.current?.focus();
   };
 
   return (
@@ -258,32 +229,21 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
       <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "radial-gradient(circle at 20% 20%, hsla(142,47%,33%,0.04) 0%, transparent 50%), radial-gradient(circle at 80% 80%, hsla(37,90%,58%,0.03) 0%, transparent 50%)" }} />
 
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="px-4 md:px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3 z-10"
-      >
-        {onBack && <motion.button whileTap={{ scale: 0.85 }} whileHover={{ x: -2 }} className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all" onClick={onBack}>←</motion.button>}
-        <motion.div whileHover={{ scale: 1.05 }} className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-lg" style={{ background: conv.avatarStyle }}>{conv.avatar}</motion.div>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="px-3 md:px-6 py-3 bg-envle-card border-b border-envle-border flex items-center gap-2 md:gap-3 z-10">
+        {onBack && <motion.button whileTap={{ scale: 0.85 }} className="w-9 h-9 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all" onClick={onBack}>←</motion.button>}
+        <motion.div whileHover={{ scale: 1.05 }} className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-base" style={{ background: conv.avatarStyle }}>{conv.avatar}</motion.div>
         <div className="flex-1 min-w-0">
-          <div className="text-base font-bold truncate">{conv.name}</div>
-          <motion.div
-            animate={{ opacity: [0.6, 1, 0.6] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="text-xs text-green-500"
-          >
-            🟢 En ligne
-          </motion.div>
+          <div className="text-sm font-bold truncate">{conv.name}</div>
+          <div className="text-[11px] text-envle-text-muted">Shift+Entrée pour envoyer</div>
         </div>
-        <div className="flex gap-1.5 md:gap-2">
+        <div className="flex gap-1">
           {["📞", "📹", "🔍"].map((icon, i) => (
             <motion.button
               key={i}
               whileTap={{ scale: 0.85 }}
-              whileHover={{ scale: 1.1, y: -2 }}
-              className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-foreground/[0.06] border-none text-envle-text-muted text-lg cursor-pointer transition-all flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light"
-              onClick={() => { if (icon === "📞") onOpenCall("audio"); else if (icon === "📹") onOpenCall("video"); else toast("🔍 Rechercher dans la conversation"); }}
+              whileHover={{ scale: 1.1 }}
+              className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-foreground/[0.06] border-none text-envle-text-muted text-base cursor-pointer transition-all flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light"
+              onClick={() => { if (icon === "📞") onOpenCall("audio"); else if (icon === "📹") onOpenCall("video"); }}
             >
               {icon}
             </motion.button>
@@ -292,141 +252,44 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
       </motion.div>
 
       {/* Messages */}
-      <div ref={areaRef} className="flex-1 overflow-y-auto px-4 md:px-6 pt-6 pb-2 flex flex-col gap-1 scrollbar-thin z-10">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2 }}
-          className="text-center text-xs text-envle-text-muted my-4 relative"
-        >
-          <span className="relative z-10 bg-background px-3">Aujourd'hui</span>
-          <div className="absolute top-1/2 left-0 right-0 h-px bg-envle-border" />
-        </motion.div>
-
+      <div ref={areaRef} className="flex-1 overflow-y-auto px-3 md:px-6 pt-4 pb-2 flex flex-col gap-1 scrollbar-thin z-10">
         <AnimatePresence initial={false}>
           {messages.map((msg) => (
-            <motion.div
-              key={msg.id}
-              variants={msgVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              layout
-              className={`flex mb-0.5 ${msg.sent ? "justify-end" : "justify-start"}`}
-            >
-              {msg.isTyping ? (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="flex items-center gap-2 py-2"
-                >
-                  <div className="flex items-center gap-1.5 px-3.5 py-2.5 bg-envle-card border border-envle-border rounded-[18px] rounded-bl-[6px]">
-                    {[0, 0.2, 0.4].map((d, i) => (
-                      <motion.span
-                        key={i}
-                        className="w-[7px] h-[7px] rounded-full bg-envle-text-muted"
-                        animate={{ y: [0, -6, 0], opacity: [0.5, 1, 0.5] }}
-                        transition={{ duration: 1.4, repeat: Infinity, delay: d, ease: "easeInOut" }}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-xs text-envle-text-muted">écrit...</span>
-                </motion.div>
-              ) : (
-                <motion.div
-                  whileHover={{ scale: 1.01 }}
-                  className={`max-w-[80%] md:max-w-[65%] px-3.5 py-2.5 rounded-[18px] text-sm leading-relaxed ${msg.sent ? "rounded-br-[6px] text-foreground" : "bg-envle-card border border-envle-border rounded-bl-[6px]"}`}
-                  style={msg.sent ? { background: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))" } : undefined}
-                >
-                  {/* Supabase file attachment */}
-                  {msg.fileUrl && (
-                    <div className="mb-1.5">
-                      {msg.messageType === "image" ? (
-                        <motion.img
-                          whileHover={{ scale: 1.03 }}
-                          src={msg.fileUrl}
-                          alt={msg.fileName || "image"}
-                          className="max-w-[240px] max-h-[200px] rounded-xl object-cover cursor-pointer"
-                          onClick={() => window.open(msg.fileUrl, "_blank")}
-                        />
-                      ) : (
-                        <motion.a
-                          whileHover={{ scale: 1.02, x: 2 }}
-                          href={msg.fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 bg-foreground/10 rounded-xl px-3 py-2 no-underline text-current"
-                        >
-                          <span className="text-2xl">📁</span>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold truncate">{msg.fileName || "Fichier"}</div>
-                            {msg.fileSize && <div className="text-[10px] opacity-60">{formatSize(msg.fileSize)}</div>}
-                          </div>
-                          <span className="text-sm opacity-60">📥</span>
-                        </motion.a>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Local file attachments (pending display) */}
-                  {msg.isImage && !msg.fileUrl && (
-                    <motion.div
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.97 }}
-                      className="w-[200px] h-[140px] rounded-xl mb-1.5 flex items-center justify-center text-[40px] cursor-pointer"
-                      style={{ background: "linear-gradient(135deg, #1a2a1a, #2d4a2d)" }}
-                      onClick={() => toast("🖼️ Ouvrir la photo")}
-                    >
-                      🖼️
-                    </motion.div>
-                  )}
-                  {msg.isVoice ? (
-                    <div className="flex items-center gap-2.5 px-3 py-2">
-                      <motion.div whileTap={{ scale: 0.85 }} whileHover={{ scale: 1.1 }} className="w-8 h-8 rounded-full bg-foreground/15 flex items-center justify-center text-sm cursor-pointer" onClick={() => toast("🎤 Lecture du message vocal")}>▶️</motion.div>
-                      <div className="flex items-center gap-0.5 flex-1">
-                        {Array.from({ length: 10 }).map((_, i) => (
-                          <motion.div
-                            key={i}
-                            className="w-[3px] rounded-sm bg-foreground/40"
-                            style={{ height: `${12 + Math.random() * 20}px` }}
-                            animate={{ scaleY: [1, 1.5 + Math.random(), 1] }}
-                            transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.1 }}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-xs opacity-70">0:28</span>
-                    </div>
-                  ) : (
-                    <>
-                      {msg.text && !msg.fileUrl && <span>{getDisplayText(msg)}</span>}
-                      {msg.text && msg.fileUrl && msg.messageType === "text" && <span>{getDisplayText(msg)}</span>}
-                      {msg.senderLang && !msg.sent && msg.text && (
-                        <motion.button whileTap={{ scale: 0.9 }} className="block text-[10px] mt-1 opacity-50 hover:opacity-80 border-none bg-transparent cursor-pointer font-body text-current" onClick={() => toggleTranslation(msg.id)}>
-                          {showTranslation[msg.id] ? "🌐 Voir l'original" : "🌐 Traduire"}
-                        </motion.button>
-                      )}
-                      {msg.files && msg.files.length > 0 && (
-                        <div className="mt-1.5 flex flex-col gap-1.5">
-                          {msg.files.map((file) => (
-                            <motion.div key={file.id} whileHover={{ scale: 1.02, x: 2 }} whileTap={{ scale: 0.98 }} className="flex items-center gap-2 bg-foreground/10 rounded-xl px-3 py-2 cursor-pointer" onClick={() => setViewingFile(file)}>
-                              {file.preview ? <img src={file.preview} alt={file.name} className="w-10 h-10 rounded-lg object-cover" /> : <span className="text-2xl">{fileIcon(file.type)}</span>}
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs font-semibold truncate">{file.name}</div>
-                                <div className="text-[10px] opacity-60 flex items-center gap-1">{formatSize(file.size)}{file.compressed && <span>· Compressé</span>}{file.enhanced && <span>· HD ✨</span>}</div>
-                              </div>
-                              <motion.span whileTap={{ scale: 1.3 }} className="text-sm opacity-60" onClick={(e) => { e.stopPropagation(); downloadFile(file); }}>📥</motion.span>
-                            </motion.div>
-                          ))}
+            <motion.div key={msg.id} variants={msgVariants} initial="initial" animate="animate" exit="exit" layout className={`flex mb-0.5 ${msg.sent ? "justify-end" : "justify-start"}`}>
+              <motion.div
+                whileHover={{ scale: 1.01 }}
+                className={`max-w-[85%] md:max-w-[65%] px-3 py-2 rounded-[18px] text-sm leading-relaxed ${msg.sent ? "rounded-br-[6px] text-foreground" : "bg-envle-card border border-envle-border rounded-bl-[6px]"}`}
+                style={msg.sent ? { background: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))" } : undefined}
+              >
+                {msg.fileUrl && (
+                  <div className="mb-1.5">
+                    {msg.messageType === "image" ? (
+                      <motion.img whileHover={{ scale: 1.03 }} src={msg.fileUrl} alt={msg.fileName || "image"} className="max-w-[220px] max-h-[180px] rounded-xl object-cover cursor-pointer" onClick={() => window.open(msg.fileUrl, "_blank")} />
+                    ) : msg.messageType === "audio" ? (
+                      <audio controls src={msg.fileUrl} className="w-full max-w-[240px] h-8" />
+                    ) : (
+                      <motion.a whileHover={{ scale: 1.02 }} href={msg.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-foreground/10 rounded-xl px-3 py-2 no-underline text-current">
+                        <span className="text-2xl">📁</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold truncate">{msg.fileName || "Fichier"}</div>
+                          {msg.fileSize && <div className="text-[10px] opacity-60">{formatSize(msg.fileSize)}</div>}
                         </div>
-                      )}
-                    </>
-                  )}
-                  <div className="text-[10px] opacity-60 mt-1 flex items-center justify-end gap-1">
-                    {msg.time}
-                    {msg.sent && <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-xs text-envle-or">✓✓</motion.span>}
+                        <span className="text-sm opacity-60">📥</span>
+                      </motion.a>
+                    )}
                   </div>
-                </motion.div>
-              )}
+                )}
+                {msg.text && msg.messageType !== "audio" && <span style={{ whiteSpace: "pre-wrap" }}>{getDisplayText(msg)}</span>}
+                {msg.senderLang && !msg.sent && msg.text && (
+                  <motion.button whileTap={{ scale: 0.9 }} className="block text-[10px] mt-1 opacity-50 hover:opacity-80 border-none bg-transparent cursor-pointer font-body text-current" onClick={() => toggleTranslation(msg.id)}>
+                    {showTranslation[msg.id] ? "🌐 Original" : "🌐 Traduire"}
+                  </motion.button>
+                )}
+                <div className="text-[10px] opacity-60 mt-1 flex items-center justify-end gap-1">
+                  {msg.time}
+                  {msg.sent && <span className="text-xs text-envle-or">✓✓</span>}
+                </div>
+              </motion.div>
             </motion.div>
           ))}
         </AnimatePresence>
@@ -435,17 +298,11 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
       {/* Pending files */}
       <AnimatePresence>
         {pendingFiles.length > 0 && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="px-3 md:px-5 py-2 bg-envle-card border-t border-envle-border z-10 flex gap-2 overflow-x-auto"
-            style={{ scrollbarWidth: "none" }}
-          >
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="px-3 md:px-5 py-2 bg-envle-card border-t border-envle-border z-10 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             {pendingFiles.map((file) => (
-              <motion.div key={file.id} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }} className="relative shrink-0 flex items-center gap-2 bg-foreground/[0.06] border border-envle-border rounded-xl px-3 py-2">
+              <motion.div key={file.id} initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.6, opacity: 0 }} className="relative shrink-0 flex items-center gap-2 bg-foreground/[0.06] border border-envle-border rounded-xl px-3 py-2">
                 {file.preview ? <img src={file.preview} alt={file.name} className="w-8 h-8 rounded-lg object-cover" /> : <span className="text-xl">{fileIcon(file.type)}</span>}
-                <div className="max-w-[120px]">
+                <div className="max-w-[100px]">
                   <div className="text-xs font-medium truncate">{file.name}</div>
                   <div className="text-[10px] text-envle-text-muted">{formatSize(file.size)}</div>
                 </div>
@@ -456,36 +313,76 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
         )}
       </AnimatePresence>
 
+      {/* Emoji picker */}
+      <AnimatePresence>
+        {showEmojis && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="px-3 md:px-5 py-2 bg-envle-card border-t border-envle-border z-10">
+            <div className="flex flex-wrap gap-1 max-h-[120px] overflow-y-auto scrollbar-thin">
+              {EMOJI_LIST.map((e) => (
+                <motion.button key={e} whileTap={{ scale: 1.4 }} className="w-8 h-8 text-lg border-none bg-transparent cursor-pointer hover:bg-foreground/[0.06] rounded-lg flex items-center justify-center" onClick={() => insertEmoji(e)}>{e}</motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Input */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="px-3 md:px-5 py-3 pb-4 bg-envle-card border-t border-envle-border flex items-end gap-2 md:gap-2.5 z-10"
-      >
-        <motion.div
-          animate={{ borderColor: inputFocused ? "hsla(142, 47%, 33%, 0.5)" : "hsla(218, 20%, 17%, 1)" }}
-          className="flex-1 bg-foreground/[0.06] border border-envle-border rounded-[22px] px-3 md:px-4 py-2.5 flex items-center gap-2 transition-shadow"
-          style={inputFocused ? { boxShadow: "0 0 0 3px hsla(142,47%,33%,0.15)" } : {}}
-        >
-          <motion.span whileHover={{ scale: 1.2, rotate: 10 }} whileTap={{ scale: 0.8 }} className="text-xl cursor-pointer opacity-60 hover:opacity-100 text-envle-text-muted hover:text-envle-vert-light transition-opacity" onClick={() => toast("😀 Emojis")}>😀</motion.span>
-          <textarea className="flex-1 bg-transparent border-none outline-none text-foreground font-body text-sm resize-none max-h-[100px] placeholder:text-envle-text-muted" placeholder="Écrire un message..." rows={1} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKey} onFocus={() => setInputFocused(true)} onBlur={() => setInputFocused(false)} />
-          <FileAttachment onFilesSelected={handleFilesSelected} isOpen={attachOpen} onToggle={() => setAttachOpen(!attachOpen)} />
-        </motion.div>
-        <motion.button whileTap={{ scale: 0.85 }} whileHover={{ scale: 1.1 }} className="w-11 h-11 md:w-12 md:h-12 rounded-xl bg-foreground/[0.06] border-none text-envle-text-muted text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light transition-all" onClick={() => toast("🎤 Maintenir pour enregistrer un vocal")}>🎙️</motion.button>
-        <motion.button
-          whileTap={{ scale: 0.85 }}
-          whileHover={{ scale: 1.12, rotate: 15 }}
-          disabled={sending}
-          className="w-11 h-11 md:w-12 md:h-12 rounded-full border-none text-foreground text-xl cursor-pointer flex items-center justify-center shadow-[0_4px_16px_hsla(142,47%,33%,0.4)] disabled:opacity-50"
-          style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }}
-          onClick={sendMessage}
-        >
-          {sending ? "⏳" : "➤"}
-        </motion.button>
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="px-2 md:px-5 py-2 pb-3 bg-envle-card border-t border-envle-border flex items-end gap-1.5 md:gap-2 z-10">
+        {isRecording ? (
+          <div className="flex-1 flex items-center gap-3 bg-envle-rouge/10 border border-envle-rouge/30 rounded-[22px] px-4 py-3">
+            <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity }} className="text-envle-rouge text-sm">🔴</motion.span>
+            <span className="text-sm font-semibold text-envle-rouge flex-1">{Math.floor(recordingTime / 60)}:{String(recordingTime % 60).padStart(2, "0")}</span>
+            <motion.button whileTap={{ scale: 0.85 }} className="text-xs text-envle-text-muted border-none bg-transparent cursor-pointer font-body" onClick={cancelRecording}>❌ Annuler</motion.button>
+            <motion.button whileTap={{ scale: 0.85 }} className="text-xs text-primary font-semibold border-none bg-transparent cursor-pointer font-body" onClick={stopRecording}>✅ Envoyer</motion.button>
+          </div>
+        ) : (
+          <motion.div
+            animate={{ borderColor: inputFocused ? "hsla(142, 47%, 33%, 0.5)" : "hsla(218, 20%, 17%, 1)" }}
+            className="flex-1 bg-foreground/[0.06] border border-envle-border rounded-[22px] px-3 py-2 flex items-end gap-1.5 transition-shadow"
+            style={inputFocused ? { boxShadow: "0 0 0 3px hsla(142,47%,33%,0.15)" } : {}}
+          >
+            <motion.span whileTap={{ scale: 0.8 }} className="text-lg cursor-pointer opacity-60 hover:opacity-100 text-envle-text-muted hover:text-envle-vert-light transition-opacity pb-0.5" onClick={() => setShowEmojis(!showEmojis)}>😀</motion.span>
+            <textarea
+              ref={textareaRef}
+              className="flex-1 bg-transparent border-none outline-none text-foreground font-body text-sm resize-none max-h-[120px] placeholder:text-envle-text-muted"
+              placeholder="Écrire un message..."
+              rows={1}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
+            />
+            <FileAttachment onFilesSelected={handleFilesSelected} isOpen={attachOpen} onToggle={() => setAttachOpen(!attachOpen)} />
+          </motion.div>
+        )}
+
+        {!isRecording && (
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            whileHover={{ scale: 1.1 }}
+            className="w-10 h-10 md:w-11 md:h-11 rounded-xl bg-foreground/[0.06] border-none text-envle-text-muted text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light transition-all shrink-0"
+            onClick={startRecording}
+            title="Enregistrer un vocal"
+          >
+            🎙️
+          </motion.button>
+        )}
+
+        {!isRecording && (
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            whileHover={{ scale: 1.12, rotate: 15 }}
+            disabled={sending}
+            className="w-10 h-10 md:w-11 md:h-11 rounded-full border-none text-foreground text-lg cursor-pointer flex items-center justify-center shadow-[0_4px_16px_hsla(142,47%,33%,0.4)] disabled:opacity-50 shrink-0"
+            style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }}
+            onClick={sendMessage}
+          >
+            {sending ? "⏳" : "➤"}
+          </motion.button>
+        )}
       </motion.div>
 
-      {/* File viewer */}
       {viewingFile && <FileViewer file={viewingFile} onClose={() => setViewingFile(null)} />}
     </main>
   );
