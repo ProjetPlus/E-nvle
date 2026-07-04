@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/hooks/use-theme";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import OAuthConsent from "./pages/OAuthConsent.tsx";
+import PWAInstallPrompt from "./components/envle/PWAInstallPrompt";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
             <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <PWAInstallPrompt />
         </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>
