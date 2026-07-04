@@ -28,22 +28,30 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
       >
         <motion.img
           src={envleLogo}
-          alt="E'nvlé Logo"
-          className="w-[220px] h-[220px] md:w-[260px] md:h-[260px] object-contain"
+          alt="E'nvlé One Logo"
+          className="w-[240px] h-[240px] md:w-[280px] md:h-[280px] object-contain"
           animate={{
             filter: [
-              "drop-shadow(0 0 30px hsla(142, 47%, 33%, 0.5))",
-              "drop-shadow(0 0 50px hsla(142, 47%, 33%, 0.8))",
-              "drop-shadow(0 0 30px hsla(142, 47%, 33%, 0.5))",
+              "drop-shadow(0 0 30px hsla(45, 90%, 55%, 0.5))",
+              "drop-shadow(0 0 60px hsla(45, 90%, 55%, 0.8))",
+              "drop-shadow(0 0 30px hsla(45, 90%, 55%, 0.5))",
             ],
           }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         />
+        <motion.h1
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.6 }}
+          className="font-display text-3xl font-bold text-white -mt-2"
+        >
+          E'nvlé <span style={{ color: "hsl(45 90% 60%)" }}>One</span>
+        </motion.h1>
         <motion.p
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.6 }}
-          className="text-envle-text-muted text-sm tracking-[3px] uppercase -mt-2"
+          transition={{ delay: 0.5, duration: 0.6 }}
+          className="text-envle-text-muted text-xs tracking-[3px] uppercase -mt-3"
         >
           Connecter · Créer · Célébrer
         </motion.p>
