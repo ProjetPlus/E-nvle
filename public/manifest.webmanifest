@@ -1,0 +1,16 @@
+{
+  "name": "E'nvlé One",
+  "short_name": "E'nvlé One",
+  "description": "La super-app africaine. Connecter. Créer. Célébrer.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0f0c",
+  "theme_color": "#0d3d2e",
+  "lang": "fr",
+  "icons": [
+    { "src": "/logo-envle.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/logo-envle.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
