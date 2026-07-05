@@ -78,6 +78,7 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
           time: m.created_at ? new Date(m.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "",
           fileUrl: m.file_url || undefined, fileName: m.file_name || undefined,
           fileSize: m.file_size ? Number(m.file_size) : undefined, messageType: m.message_type || "text",
+          senderLang: m.sender_id !== user.id ? ((m as any).sender_lang || "auto") : undefined,
         })));
         await supabase.from("messages").update({ is_read: true }).eq("conversation_id", conv.id).neq("sender_id", user.id).eq("is_read", false);
       }
@@ -94,6 +95,7 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
             time: m.created_at ? new Date(m.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "",
             fileUrl: m.file_url || undefined, fileName: m.file_name || undefined,
             fileSize: m.file_size ? Number(m.file_size) : undefined, messageType: m.message_type || "text",
+            senderLang: m.sender_id !== user.id ? (m.sender_lang || "auto") : undefined,
           };
           if (m.sender_id !== user.id && autoReply && nextMessage.text) void generateAiReply(nextMessage.text, true);
           return [...prev, nextMessage];
@@ -350,7 +352,7 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
                 )}
                 {msg.text && msg.messageType !== "audio" && <span style={{ whiteSpace: "pre-wrap" }}>{getDisplayText(msg)}</span>}
                 {msg.senderLang && !msg.sent && msg.text && (
-                  <motion.button whileTap={{ scale: 0.9 }} className="block text-[10px] mt-1 opacity-50 hover:opacity-80 border-none bg-transparent cursor-pointer font-body text-current" onClick={() => toggleTranslation(msg.id)}>
+                  <motion.button whileTap={{ scale: 0.9 }} className="block text-[10px] mt-1 opacity-50 hover:opacity-80 border-none bg-transparent cursor-pointer font-body text-current" onClick={() => toggleTranslation(msg)}>
                     {showTranslation[msg.id] ? "🌐 Original" : "🌐 Traduire"}
                   </motion.button>
                 )}
