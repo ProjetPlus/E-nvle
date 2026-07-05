@@ -21,6 +21,7 @@ import NotificationCenter, { type Notification } from "@/components/envle/Notifi
 import CreateBusinessModal from "@/components/envle/CreateBusinessModal";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/use-auth";
+import { useRealtimeNotifications } from "@/hooks/use-realtime-notifications";
 
 const pageTransition = {
   initial: { opacity: 0, x: 20, scale: 0.98 },
@@ -66,6 +67,7 @@ const Index = () => {
   const [createModal, setCreateModal] = useState<{ open: boolean; type: "business" | "job" | "product" }>({ open: false, type: "business" });
   const isMobile = useIsMobile();
   const { user } = useAuth();
+  useRealtimeNotifications(user?.id, (notification) => setNotifications((prev) => [notification, ...prev].slice(0, 80)));
 
   const userInitials = user?.email ? user.email.substring(0, 2).toUpperCase() : "?";
 

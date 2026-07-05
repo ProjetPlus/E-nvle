@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import type { Conversation } from "./ConversationPanel";
 import FileAttachment, { type FileAttachmentData, formatSize } from "./FileAttachment";
 import FileViewer from "./FileViewer";
-import { getTranslatedText } from "@/lib/translator";
+import { getAppLanguage } from "./SettingsModule";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -46,9 +46,14 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
   const [pendingFiles, setPendingFiles] = useState<FileAttachmentData[]>([]);
   const [viewingFile, setViewingFile] = useState<FileAttachmentData | null>(null);
   const [showTranslation, setShowTranslation] = useState<Record<string, boolean>>({});
+  const [translatedTexts, setTranslatedTexts] = useState<Record<string, string>>({});
   const [inputFocused, setInputFocused] = useState(false);
   const [sending, setSending] = useState(false);
   const [showEmojis, setShowEmojis] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiModel, setAiModel] = useState<"gemini" | "gpt" | "pro">("gemini");
+  const [autoReply, setAutoReply] = useState(localStorage.getItem("envle-ai-auto-reply") === "true");
+  const [aiBusy, setAiBusy] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const areaRef = useRef<HTMLDivElement>(null);
@@ -73,6 +78,7 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
           time: m.created_at ? new Date(m.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "",
           fileUrl: m.file_url || undefined, fileName: m.file_name || undefined,
           fileSize: m.file_size ? Number(m.file_size) : undefined, messageType: m.message_type || "text",
+          senderLang: m.sender_id !== user.id ? ((m as any).sender_lang || "auto") : undefined,
         })));
         await supabase.from("messages").update({ is_read: true }).eq("conversation_id", conv.id).neq("sender_id", user.id).eq("is_read", false);
       }
@@ -84,12 +90,15 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
         const m = payload.new as any;
         setMessages((prev) => {
           if (prev.some((msg) => msg.id === m.id)) return prev;
-          return [...prev, {
+          const nextMessage = {
             id: m.id, text: m.content || "", sent: m.sender_id === user.id,
             time: m.created_at ? new Date(m.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "",
             fileUrl: m.file_url || undefined, fileName: m.file_name || undefined,
             fileSize: m.file_size ? Number(m.file_size) : undefined, messageType: m.message_type || "text",
-          }];
+            senderLang: m.sender_id !== user.id ? (m.sender_lang || "auto") : undefined,
+          };
+          if (m.sender_id !== user.id && autoReply && nextMessage.text) void generateAiReply(nextMessage.text, true);
+          return [...prev, nextMessage];
         });
         if (m.sender_id !== user.id) supabase.from("messages").update({ is_read: true }).eq("id", m.id).then(() => {});
       })
@@ -100,7 +109,7 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
   const uploadFileToStorage = useCallback(async (file: File) => {
     const ext = file.name.split(".").pop() || "bin";
     const path = `${user!.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const bucket = file.type.startsWith("image/") || file.type.startsWith("video/") ? "media" : "files";
+    const bucket = "chat-files";
     const { error } = await supabase.storage.from(bucket).upload(path, file, { cacheControl: "3600", upsert: false });
     if (error) { toast.error(`❌ Erreur upload: ${error.message}`); return null; }
     const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
@@ -134,6 +143,36 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
       await supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conv.id);
     } catch { toast.error("❌ Erreur d'envoi"); } finally { setSending(false); }
   }, [input, pendingFiles, user, conv.id, uploadFileToStorage]);
+
+  const generateAiReply = useCallback(async (sourceText?: string, automatic = false) => {
+    const text = sourceText || input.trim();
+    if (!text) return;
+    setAiBusy(true);
+    const { data, error } = await supabase.functions.invoke("chat-ai", {
+      body: {
+        model: aiModel,
+        mode: automatic ? "auto_reply" : "assist",
+        language: getAppLanguage(),
+        messages: [
+          { role: "user", content: automatic ? `Réponds naturellement à ce message: ${text}` : `Améliore ou propose une réponse pour: ${text}` },
+        ],
+      },
+    });
+    setAiBusy(false);
+    if (error || data?.error) {
+      toast.error(data?.error || error?.message || "IA indisponible");
+      return;
+    }
+    setInput(data.text || "");
+    if (automatic) toast.success("🤖 Réponse automatique préparée");
+  }, [aiModel, input]);
+
+  const toggleAutoReply = () => {
+    const next = !autoReply;
+    setAutoReply(next);
+    localStorage.setItem("envle-ai-auto-reply", String(next));
+    toast.success(next ? "🤖 Réponse automatique activée" : "🤖 Réponse automatique désactivée");
+  };
 
   // Enter = newline, Shift+Enter or Ctrl+Enter = send
   const handleKey = (e: React.KeyboardEvent) => {
@@ -211,10 +250,22 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
     return "📁";
   };
 
-  const toggleTranslation = (msgId: string) => setShowTranslation((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
+  const toggleTranslation = async (msg: Message) => {
+    const next = !showTranslation[msg.id];
+    setShowTranslation((prev) => ({ ...prev, [msg.id]: next }));
+    if (!next || translatedTexts[msg.id]) return;
+    const { data, error } = await supabase.functions.invoke("translate-message", {
+      body: { text: msg.text, sourceLang: msg.senderLang || "auto", targetLang: getAppLanguage() },
+    });
+    if (error || data?.error) {
+      toast.error(data?.error || error?.message || "Traduction indisponible");
+      return;
+    }
+    setTranslatedTexts((prev) => ({ ...prev, [msg.id]: data.translatedText || msg.text }));
+  };
   const getDisplayText = (msg: Message) => {
     if (!msg.senderLang || msg.sent) return msg.text;
-    if (showTranslation[msg.id]) return getTranslatedText(msg.text, msg.senderLang);
+    if (showTranslation[msg.id]) return translatedTexts[msg.id] || "Traduction...";
     return msg.text;
   };
 
@@ -237,19 +288,39 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
           <div className="text-[11px] text-envle-text-muted">Shift+Entrée pour envoyer</div>
         </div>
         <div className="flex gap-1">
-          {["📞", "📹", "🔍"].map((icon, i) => (
+          {["🤖", "📞", "📹", "🔍"].map((icon, i) => (
             <motion.button
               key={i}
               whileTap={{ scale: 0.85 }}
               whileHover={{ scale: 1.1 }}
               className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-foreground/[0.06] border-none text-envle-text-muted text-base cursor-pointer transition-all flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light"
-              onClick={() => { if (icon === "📞") onOpenCall("audio"); else if (icon === "📹") onOpenCall("video"); }}
+              onClick={() => { if (icon === "🤖") setAiOpen((v) => !v); else if (icon === "📞") onOpenCall("audio"); else if (icon === "📹") onOpenCall("video"); }}
             >
               {icon}
             </motion.button>
           ))}
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {aiOpen && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="z-10 bg-envle-card border-b border-envle-border px-3 md:px-6 py-2 overflow-hidden">
+            <div className="flex items-center gap-2 flex-wrap">
+              <select value={aiModel} onChange={(e) => setAiModel(e.target.value as "gemini" | "gpt" | "pro")} className="bg-foreground/[0.06] border border-envle-border rounded-xl px-3 py-2 text-xs outline-none">
+                <option value="gemini">Gemini Flash</option>
+                <option value="gpt">GPT</option>
+                <option value="pro">Pro</option>
+              </select>
+              <motion.button whileTap={{ scale: 0.95 }} disabled={aiBusy} className="px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold border-none cursor-pointer disabled:opacity-50" onClick={() => generateAiReply()}>
+                {aiBusy ? "IA..." : "✨ Proposer"}
+              </motion.button>
+              <motion.button whileTap={{ scale: 0.95 }} className={`px-3 py-2 rounded-xl border text-xs font-semibold cursor-pointer ${autoReply ? "bg-primary/20 border-primary/40 text-envle-vert-light" : "bg-transparent border-envle-border text-envle-text-muted"}`} onClick={toggleAutoReply}>
+                Réponse auto {autoReply ? "ON" : "OFF"}
+              </motion.button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Messages */}
       <div ref={areaRef} className="flex-1 overflow-y-auto px-3 md:px-6 pt-4 pb-2 flex flex-col gap-1 scrollbar-thin z-10">
@@ -281,7 +352,7 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
                 )}
                 {msg.text && msg.messageType !== "audio" && <span style={{ whiteSpace: "pre-wrap" }}>{getDisplayText(msg)}</span>}
                 {msg.senderLang && !msg.sent && msg.text && (
-                  <motion.button whileTap={{ scale: 0.9 }} className="block text-[10px] mt-1 opacity-50 hover:opacity-80 border-none bg-transparent cursor-pointer font-body text-current" onClick={() => toggleTranslation(msg.id)}>
+                  <motion.button whileTap={{ scale: 0.9 }} className="block text-[10px] mt-1 opacity-50 hover:opacity-80 border-none bg-transparent cursor-pointer font-body text-current" onClick={() => toggleTranslation(msg)}>
                     {showTranslation[msg.id] ? "🌐 Original" : "🌐 Traduire"}
                   </motion.button>
                 )}

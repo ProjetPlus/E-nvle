@@ -75,10 +75,10 @@ const StoriesModule = ({ onBack }: { onBack: () => void }) => {
 
     const ext = file.name.split(".").pop() || "jpg";
     const path = `${user.id}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("media").upload(path, file);
+    const { error } = await supabase.storage.from("stories").upload(path, file);
     if (error) { toast.error("❌ Erreur upload"); setCreating(false); return; }
 
-    const { data: urlData } = supabase.storage.from("media").getPublicUrl(path);
+    const { data: urlData } = supabase.storage.from("stories").getPublicUrl(path);
     const mediaType = file.type.startsWith("video/") ? "video" : "image";
 
     const caption = prompt("Ajouter une légende (optionnel):") || "";
