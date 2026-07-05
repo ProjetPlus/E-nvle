@@ -32,7 +32,7 @@ export default defineConfig(({ mode }) => ({
             options: { cacheName: "envle-pages" },
           },
           {
-            urlPattern: ({ url }) => url.origin === self.location.origin && /\/assets\/.+\.[a-f0-9]+\./.test(url.pathname),
+            urlPattern: ({ url }) => /\/assets\/.+\.[a-f0-9]+\./.test(url.pathname),
             handler: "CacheFirst",
             options: { cacheName: "envle-assets" },
           },
