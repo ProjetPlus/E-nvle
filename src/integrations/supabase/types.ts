@@ -23,6 +23,10 @@ export type Database = {
           duration: number | null
           ended_at: string | null
           id: string
+          is_group: boolean | null
+          participants: Json | null
+          quality_mode: string | null
+          recording_url: string | null
           started_at: string | null
           status: string | null
         }
@@ -34,6 +38,10 @@ export type Database = {
           duration?: number | null
           ended_at?: string | null
           id?: string
+          is_group?: boolean | null
+          participants?: Json | null
+          quality_mode?: string | null
+          recording_url?: string | null
           started_at?: string | null
           status?: string | null
         }
@@ -45,6 +53,10 @@ export type Database = {
           duration?: number | null
           ended_at?: string | null
           id?: string
+          is_group?: boolean | null
+          participants?: Json | null
+          quality_mode?: string | null
+          recording_url?: string | null
           started_at?: string | null
           status?: string | null
         }
@@ -54,6 +66,50 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comments: {
+        Row: {
+          content: string
+          created_at: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          parent_id: string | null
+          reactions: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          parent_id?: string | null
+          reactions?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          parent_id?: string | null
+          reactions?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
             referencedColumns: ["id"]
           },
         ]
@@ -123,11 +179,38 @@ export type Database = {
           },
         ]
       }
+      contacts: {
+        Row: {
+          contact_id: string
+          created_at: string | null
+          id: string
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string | null
+          id?: string
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string | null
+          id?: string
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       conversation_members: {
         Row: {
           conversation_id: string
           id: string
           joined_at: string | null
+          last_read_at: string | null
+          muted: boolean | null
+          pinned: boolean | null
           role: string | null
           user_id: string
         }
@@ -135,6 +218,9 @@ export type Database = {
           conversation_id: string
           id?: string
           joined_at?: string | null
+          last_read_at?: string | null
+          muted?: boolean | null
+          pinned?: boolean | null
           role?: string | null
           user_id: string
         }
@@ -142,6 +228,9 @@ export type Database = {
           conversation_id?: string
           id?: string
           joined_at?: string | null
+          last_read_at?: string | null
+          muted?: boolean | null
+          pinned?: boolean | null
           role?: string | null
           user_id?: string
         }
@@ -162,8 +251,13 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           description: string | null
+          e2ee_enabled: boolean | null
+          ephemeral_ttl: number | null
           id: string
           is_group: boolean | null
+          is_locked: boolean | null
+          lock_hash: string | null
+          lock_method: string | null
           name: string | null
           updated_at: string | null
         }
@@ -173,8 +267,13 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          e2ee_enabled?: boolean | null
+          ephemeral_ttl?: number | null
           id?: string
           is_group?: boolean | null
+          is_locked?: boolean | null
+          lock_hash?: string | null
+          lock_method?: string | null
           name?: string | null
           updated_at?: string | null
         }
@@ -184,15 +283,48 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          e2ee_enabled?: boolean | null
+          ephemeral_ttl?: number | null
           id?: string
           is_group?: boolean | null
+          is_locked?: boolean | null
+          lock_hash?: string | null
+          lock_method?: string | null
           name?: string | null
           updated_at?: string | null
         }
         Relationships: []
       }
+      currencies: {
+        Row: {
+          code: string
+          country: string | null
+          is_active: boolean | null
+          name: string
+          rate_to_xof: number | null
+          symbol: string
+        }
+        Insert: {
+          code: string
+          country?: string | null
+          is_active?: boolean | null
+          name: string
+          rate_to_xof?: number | null
+          symbol: string
+        }
+        Update: {
+          code?: string
+          country?: string | null
+          is_active?: boolean | null
+          name?: string
+          rate_to_xof?: number | null
+          symbol?: string
+        }
+        Relationships: []
+      }
       jobs: {
         Row: {
+          applications_count: number | null
           company: string | null
           created_at: string | null
           description: string | null
@@ -203,8 +335,10 @@ export type Database = {
           posted_by: string
           salary_range: string | null
           title: string
+          views: number | null
         }
         Insert: {
+          applications_count?: number | null
           company?: string | null
           created_at?: string | null
           description?: string | null
@@ -215,8 +349,10 @@ export type Database = {
           posted_by: string
           salary_range?: string | null
           title: string
+          views?: number | null
         }
         Update: {
+          applications_count?: number | null
           company?: string | null
           created_at?: string | null
           description?: string | null
@@ -227,6 +363,7 @@ export type Database = {
           posted_by?: string
           salary_range?: string | null
           title?: string
+          views?: number | null
         }
         Relationships: []
       }
@@ -235,12 +372,19 @@ export type Database = {
           content: string | null
           conversation_id: string
           created_at: string | null
+          deleted_at: string | null
+          delivered_to: string[] | null
+          edited_at: string | null
+          expires_at: string | null
           file_name: string | null
           file_size: number | null
           file_url: string | null
+          forwarded_from: string | null
           id: string
           is_read: boolean | null
           message_type: string | null
+          reactions: Json | null
+          read_by: string[] | null
           reply_to: string | null
           sender_id: string
         }
@@ -248,12 +392,19 @@ export type Database = {
           content?: string | null
           conversation_id: string
           created_at?: string | null
+          deleted_at?: string | null
+          delivered_to?: string[] | null
+          edited_at?: string | null
+          expires_at?: string | null
           file_name?: string | null
           file_size?: number | null
           file_url?: string | null
+          forwarded_from?: string | null
           id?: string
           is_read?: boolean | null
           message_type?: string | null
+          reactions?: Json | null
+          read_by?: string[] | null
           reply_to?: string | null
           sender_id: string
         }
@@ -261,12 +412,19 @@ export type Database = {
           content?: string | null
           conversation_id?: string
           created_at?: string | null
+          deleted_at?: string | null
+          delivered_to?: string[] | null
+          edited_at?: string | null
+          expires_at?: string | null
           file_name?: string | null
           file_size?: number | null
           file_url?: string | null
+          forwarded_from?: string | null
           id?: string
           is_read?: boolean | null
           message_type?: string | null
+          reactions?: Json | null
+          read_by?: string[] | null
           reply_to?: string | null
           sender_id?: string
         }
@@ -276,6 +434,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_forwarded_from_fkey"
+            columns: ["forwarded_from"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
           {
@@ -289,8 +454,10 @@ export type Database = {
       }
       notifications: {
         Row: {
+          action_url: string | null
           body: string | null
           created_at: string | null
+          data: Json | null
           icon: string | null
           id: string
           is_read: boolean | null
@@ -299,8 +466,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          action_url?: string | null
           body?: string | null
           created_at?: string | null
+          data?: Json | null
           icon?: string | null
           id?: string
           is_read?: boolean | null
@@ -309,8 +478,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          action_url?: string | null
           body?: string | null
           created_at?: string | null
+          data?: Json | null
           icon?: string | null
           id?: string
           is_read?: boolean | null
@@ -397,11 +568,14 @@ export type Database = {
           id: string
           images: string[] | null
           is_active: boolean | null
+          likes: number | null
           name: string
           price: number
           seller_id: string
+          shares: number | null
           stock: number | null
           updated_at: string | null
+          views: number | null
         }
         Insert: {
           category?: string | null
@@ -411,11 +585,14 @@ export type Database = {
           id?: string
           images?: string[] | null
           is_active?: boolean | null
+          likes?: number | null
           name: string
           price?: number
           seller_id: string
+          shares?: number | null
           stock?: number | null
           updated_at?: string | null
+          views?: number | null
         }
         Update: {
           category?: string | null
@@ -425,59 +602,176 @@ export type Database = {
           id?: string
           images?: string[] | null
           is_active?: boolean | null
+          likes?: number | null
           name?: string
           price?: number
           seller_id?: string
+          shares?: number | null
           stock?: number | null
           updated_at?: string | null
+          views?: number | null
         }
         Relationships: []
       }
       profiles: {
         Row: {
+          app_lock_enabled: boolean | null
+          app_lock_hash: string | null
+          app_lock_method: string | null
           avatar_url: string | null
           bio: string | null
           country: string | null
           created_at: string | null
+          currency: string | null
           email: string | null
           full_name: string
           id: string
+          language: string | null
           last_seen: string | null
           location: string | null
+          notification_sound: string | null
           phone: string | null
           profession: string | null
+          push_enabled: boolean | null
+          ringtone: string | null
           status: string | null
+          theme: string | null
           updated_at: string | null
+          username: string | null
         }
         Insert: {
+          app_lock_enabled?: boolean | null
+          app_lock_hash?: string | null
+          app_lock_method?: string | null
           avatar_url?: string | null
           bio?: string | null
           country?: string | null
           created_at?: string | null
+          currency?: string | null
           email?: string | null
           full_name?: string
           id: string
+          language?: string | null
           last_seen?: string | null
           location?: string | null
+          notification_sound?: string | null
           phone?: string | null
           profession?: string | null
+          push_enabled?: boolean | null
+          ringtone?: string | null
           status?: string | null
+          theme?: string | null
           updated_at?: string | null
+          username?: string | null
         }
         Update: {
+          app_lock_enabled?: boolean | null
+          app_lock_hash?: string | null
+          app_lock_method?: string | null
           avatar_url?: string | null
           bio?: string | null
           country?: string | null
           created_at?: string | null
+          currency?: string | null
           email?: string | null
           full_name?: string
           id?: string
+          language?: string | null
           last_seen?: string | null
           location?: string | null
+          notification_sound?: string | null
           phone?: string | null
           profession?: string | null
+          push_enabled?: boolean | null
+          ringtone?: string | null
           status?: string | null
+          theme?: string | null
           updated_at?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string | null
+          created_at: string | null
+          endpoint: string
+          id: string
+          p256dh: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth?: string | null
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          p256dh?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string | null
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          p256dh?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      reactions: {
+        Row: {
+          created_at: string | null
+          emoji: string
+          entity_id: string
+          entity_type: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          emoji: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          emoji?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      shares: {
+        Row: {
+          channel: string | null
+          created_at: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          channel?: string | null
+          created_at?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          channel?: string | null
+          created_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -489,6 +783,7 @@ export type Database = {
           id: string
           media_type: string | null
           media_url: string
+          reactions: Json | null
           user_id: string
           views_count: number | null
         }
@@ -499,6 +794,7 @@ export type Database = {
           id?: string
           media_type?: string | null
           media_url: string
+          reactions?: Json | null
           user_id: string
           views_count?: number | null
         }
@@ -509,6 +805,7 @@ export type Database = {
           id?: string
           media_type?: string | null
           media_url?: string
+          reactions?: Json | null
           user_id?: string
           views_count?: number | null
         }
@@ -573,6 +870,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       wallet_transactions: {
         Row: {
           amount: number
@@ -614,11 +932,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_ephemeral_messages: { Args: never; Returns: undefined }
       generate_otp: { Args: { p_email: string }; Returns: Json }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_conversation_member: {
+        Args: { _conv: string; _user: string }
+        Returns: boolean
+      }
       verify_otp: { Args: { p_code: string; p_email: string }; Returns: Json }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -745,6 +1075,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+    },
   },
 } as const
