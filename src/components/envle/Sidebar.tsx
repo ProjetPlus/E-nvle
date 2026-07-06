@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "@/hooks/use-theme";
@@ -28,6 +29,7 @@ const navItems = [
 
 const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall, onOpenNotifications, isOpen, onClose, unreadNotifications = 0, userInitials = "?" }: SidebarProps) => {
   const { theme, toggleTheme } = useTheme();
+  const { user, signOut } = useAuth();
 
   const handleNav = (id: string) => {
     onNavChange(id);
@@ -107,7 +109,7 @@ const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall, onOpenNotific
         whileTap={{ scale: 0.9 }}
         className="w-10 h-10 rounded-full border-2 border-primary cursor-pointer flex items-center justify-center font-bold text-sm text-foreground mt-1"
         style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))" }}
-        onClick={onOpenAuth}
+        onClick={user ? () => { if(confirm("Se déconnecter ?")) signOut(); } : onOpenAuth}
       >
         {userInitials}
       </motion.div>
