@@ -16,9 +16,14 @@ export type Database = {
     Tables: {
       calls: {
         Row: {
+          answered_at: string | null
           call_type: string | null
           callee_id: string | null
+          callee_muted: boolean | null
+          callee_video_enabled: boolean | null
           caller_id: string
+          caller_muted: boolean | null
+          caller_video_enabled: boolean | null
           conversation_id: string | null
           duration: number | null
           ended_at: string | null
@@ -27,13 +32,19 @@ export type Database = {
           participants: Json | null
           quality_mode: string | null
           recording_url: string | null
+          ring_state: string | null
           started_at: string | null
           status: string | null
         }
         Insert: {
+          answered_at?: string | null
           call_type?: string | null
           callee_id?: string | null
+          callee_muted?: boolean | null
+          callee_video_enabled?: boolean | null
           caller_id: string
+          caller_muted?: boolean | null
+          caller_video_enabled?: boolean | null
           conversation_id?: string | null
           duration?: number | null
           ended_at?: string | null
@@ -42,13 +53,19 @@ export type Database = {
           participants?: Json | null
           quality_mode?: string | null
           recording_url?: string | null
+          ring_state?: string | null
           started_at?: string | null
           status?: string | null
         }
         Update: {
+          answered_at?: string | null
           call_type?: string | null
           callee_id?: string | null
+          callee_muted?: boolean | null
+          callee_video_enabled?: boolean | null
           caller_id?: string
+          caller_muted?: boolean | null
+          caller_video_enabled?: boolean | null
           conversation_id?: string | null
           duration?: number | null
           ended_at?: string | null
@@ -57,6 +74,7 @@ export type Database = {
           participants?: Json | null
           quality_mode?: string | null
           recording_url?: string | null
+          ring_state?: string | null
           started_at?: string | null
           status?: string | null
         }
@@ -201,7 +219,22 @@ export type Database = {
           status?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "contacts_contact_profile_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_user_profile_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       conversation_members: {
         Row: {
@@ -621,6 +654,7 @@ export type Database = {
           avatar_url: string | null
           bio: string | null
           country: string | null
+          cover_url: string | null
           created_at: string | null
           currency: string | null
           email: string | null
@@ -631,9 +665,12 @@ export type Database = {
           location: string | null
           notification_sound: string | null
           phone: string | null
+          phone_changed_at: string | null
           profession: string | null
+          profile_completed: boolean | null
           push_enabled: boolean | null
           ringtone: string | null
+          searchable_phone: string | null
           status: string | null
           theme: string | null
           updated_at: string | null
@@ -646,6 +683,7 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           country?: string | null
+          cover_url?: string | null
           created_at?: string | null
           currency?: string | null
           email?: string | null
@@ -656,9 +694,12 @@ export type Database = {
           location?: string | null
           notification_sound?: string | null
           phone?: string | null
+          phone_changed_at?: string | null
           profession?: string | null
+          profile_completed?: boolean | null
           push_enabled?: boolean | null
           ringtone?: string | null
+          searchable_phone?: string | null
           status?: string | null
           theme?: string | null
           updated_at?: string | null
@@ -671,6 +712,7 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           country?: string | null
+          cover_url?: string | null
           created_at?: string | null
           currency?: string | null
           email?: string | null
@@ -681,9 +723,12 @@ export type Database = {
           location?: string | null
           notification_sound?: string | null
           phone?: string | null
+          phone_changed_at?: string | null
           profession?: string | null
+          profile_completed?: boolean | null
           push_enabled?: boolean | null
           ringtone?: string | null
+          searchable_phone?: string | null
           status?: string | null
           theme?: string | null
           updated_at?: string | null
@@ -777,39 +822,62 @@ export type Database = {
       }
       stories: {
         Row: {
+          allow_reshare: boolean | null
           caption: string | null
           created_at: string | null
           expires_at: string | null
           id: string
+          is_live: boolean | null
+          live_participants: Json | null
+          live_status: string | null
           media_type: string | null
           media_url: string
           reactions: Json | null
+          reshared_from: string | null
           user_id: string
           views_count: number | null
         }
         Insert: {
+          allow_reshare?: boolean | null
           caption?: string | null
           created_at?: string | null
           expires_at?: string | null
           id?: string
+          is_live?: boolean | null
+          live_participants?: Json | null
+          live_status?: string | null
           media_type?: string | null
           media_url: string
           reactions?: Json | null
+          reshared_from?: string | null
           user_id: string
           views_count?: number | null
         }
         Update: {
+          allow_reshare?: boolean | null
           caption?: string | null
           created_at?: string | null
           expires_at?: string | null
           id?: string
+          is_live?: boolean | null
+          live_participants?: Json | null
+          live_status?: string | null
           media_type?: string | null
           media_url?: string
           reactions?: Json | null
+          reshared_from?: string | null
           user_id?: string
           views_count?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "stories_reshared_from_fkey"
+            columns: ["reshared_from"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       story_views: {
         Row: {
