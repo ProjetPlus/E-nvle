@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { toast } from "sonner";
 import SplashScreen from "@/components/envle/SplashScreen";
 import Sidebar from "@/components/envle/Sidebar";
 import ConversationPanel from "@/components/envle/ConversationPanel";
