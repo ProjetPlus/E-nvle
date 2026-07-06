@@ -2,6 +2,8 @@ export const notificationSounds = [
   { id: "default", label: "Classique", frequency: 880, pattern: [0.12, 0.08, 0.12] },
   { id: "soft", label: "Doux", frequency: 660, pattern: [0.18] },
   { id: "call", label: "Appel", frequency: 740, pattern: [0.18, 0.08, 0.18, 0.08, 0.24] },
+  { id: "incoming", label: "Entrant E'nvlé", frequency: 820, pattern: [0.22, 0.08, 0.22, 0.18, 0.34] },
+  { id: "outgoing", label: "Sortant E'nvlé", frequency: 510, pattern: [0.42, 0.16, 0.18] },
   { id: "gold", label: "Or", frequency: 990, pattern: [0.08, 0.05, 0.08, 0.05, 0.2] },
 ] as const;
 
@@ -30,4 +32,23 @@ export const playNotificationSound = (soundId = "default") => {
   });
 
   window.setTimeout(() => void ctx.close(), Math.ceil((cursor - ctx.currentTime + 0.4) * 1000));
+};
+
+export const playLoopingSound = (soundId = "call") => {
+  let stopped = false;
+  let timer: number | undefined;
+  const preset = notificationSounds.find((s) => s.id === soundId) ?? notificationSounds[0];
+  const durationMs = Math.max(900, preset.pattern.reduce((total, part) => total + part * 1000 + 90, 0) + 650);
+
+  const loop = () => {
+    if (stopped) return;
+    playNotificationSound(soundId);
+    timer = window.setTimeout(loop, durationMs);
+  };
+
+  loop();
+  return () => {
+    stopped = true;
+    if (timer) window.clearTimeout(timer);
+  };
 };
