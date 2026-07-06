@@ -1,5 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { toast } from "sonner";
 import SplashScreen from "@/components/envle/SplashScreen";
 import Sidebar from "@/components/envle/Sidebar";
 import ConversationPanel from "@/components/envle/ConversationPanel";
@@ -22,6 +23,8 @@ import CreateBusinessModal from "@/components/envle/CreateBusinessModal";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/use-auth";
 import { useRealtimeNotifications } from "@/hooks/use-realtime-notifications";
+import { supabase } from "@/integrations/supabase/client";
+import { playLoopingSound } from "@/lib/sounds";
 
 const pageTransition = {
   initial: { opacity: 0, x: 20, scale: 0.98 },
@@ -46,6 +49,8 @@ const defaultProfile: UserProfile = {
   email: "",
   bio: "",
   avatar: "?",
+  avatarUrl: "",
+  coverUrl: "",
   avatarStyle: "linear-gradient(135deg, hsl(142 47% 23%), hsl(142 47% 33%))",
   location: "",
   profession: "",
@@ -59,6 +64,8 @@ const Index = () => {
   const [authOpen, setAuthOpen] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
   const [callType, setCallType] = useState("video");
+  const [currentCallId, setCurrentCallId] = useState<string | undefined>();
+  const [callDirection, setCallDirection] = useState<"incoming" | "outgoing" | "meeting">("meeting");
   const [mobileView, setMobileView] = useState<"list" | "chat">("list");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -66,20 +73,74 @@ const Index = () => {
   const [userProfile, setUserProfile] = useState<UserProfile>(defaultProfile);
   const [createModal, setCreateModal] = useState<{ open: boolean; type: "business" | "job" | "product" }>({ open: false, type: "business" });
   const isMobile = useIsMobile();
-  const { user } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   useRealtimeNotifications(user?.id, (notification) => setNotifications((prev) => [notification, ...prev].slice(0, 80)));
 
-  const userInitials = user?.email ? user.email.substring(0, 2).toUpperCase() : "?";
+  const userInitials = profile?.full_name ? profile.full_name.substring(0, 2).toUpperCase() : user?.email ? user.email.substring(0, 2).toUpperCase() : "?";
+  const mustCompleteProfile = Boolean(user && profile && !profile.profile_completed);
+
+  useEffect(() => {
+    if (!profile) return;
+    setUserProfile({
+      name: profile.full_name || "",
+      phone: profile.phone || "",
+      email: profile.email || user?.email || "",
+      bio: profile.bio || "",
+      avatar: (profile.full_name || user?.email || "?").charAt(0).toUpperCase(),
+      avatarUrl: profile.avatar_url || "",
+      coverUrl: profile.cover_url || "",
+      avatarStyle: defaultProfile.avatarStyle,
+      location: profile.location || "",
+      profession: profile.profession || "",
+    });
+    if (!profile.profile_completed) setActiveNav("settings");
+  }, [profile, user?.email]);
+
+  useEffect(() => {
+    if (!user) { setAuthOpen(true); return; }
+    setAuthOpen(false);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`calls-live-${user.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "calls", filter: `callee_id=eq.${user.id}` }, (payload) => {
+        const call = payload.new as any;
+        setCurrentCallId(call.id);
+        setCallDirection("incoming");
+        setCallType(call.call_type || "audio");
+        setCallOpen(true);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
 
   const handleSplashFinish = useCallback(() => {
     setShowSplash(false);
     setTimeout(() => setAppVisible(true), 50);
   }, []);
 
-  const openCall = useCallback((type = "video") => {
+  const openCall = useCallback(async (type = "video") => {
     setCallType(type);
+    setCallDirection(activeConv.contactId ? "outgoing" : "meeting");
+    setCurrentCallId(undefined);
+    if (user && activeConv.contactId) {
+      const stopTone = playLoopingSound("outgoing");
+      window.setTimeout(stopTone, 7000);
+      const { data, error } = await supabase.from("calls").insert({
+        caller_id: user.id,
+        callee_id: activeConv.contactId,
+        conversation_id: activeConv.id || null,
+        call_type: type,
+        status: "ringing",
+        ring_state: "ringing",
+      } as any).select().single();
+      if (error) { toast.error(error.message); return; }
+      setCurrentCallId(data.id);
+    }
     setCallOpen(true);
-  }, []);
+  }, [activeConv.contactId, activeConv.id, user]);
 
   const handleSelectConv = useCallback((conv: Conversation) => {
     setActiveConv(conv);
@@ -97,6 +158,8 @@ const Index = () => {
 
   const renderMainContent = () => {
     const goChat = () => setActiveNav("chat");
+    if (authLoading) return <div className="flex-1 grid place-items-center bg-background text-envle-text-muted">Chargement...</div>;
+    if (!user) return <div className="flex-1 grid place-items-center bg-background text-center px-6"><button className="px-5 py-3 rounded-2xl bg-primary text-primary-foreground font-semibold" onClick={() => setAuthOpen(true)}>Se connecter</button></div>;
 
     return (
       <AnimatePresence mode="wait">
@@ -108,7 +171,7 @@ const Index = () => {
           {activeNav === "jobs" && <JobsModule onBack={goChat} onCreateJob={() => setCreateModal({ open: true, type: "job" })} onCreateBusiness={() => setCreateModal({ open: true, type: "business" })} />}
           {activeNav === "map" && <MapModule onBack={goChat} />}
           {activeNav === "wallet" && <WalletModule onBack={goChat} />}
-          {activeNav === "settings" && <SettingsModule onBack={goChat} userProfile={userProfile} onUpdateProfile={setUserProfile} />}
+          {activeNav === "settings" && <SettingsModule onBack={goChat} userProfile={userProfile} onUpdateProfile={setUserProfile} requireProfile={mustCompleteProfile} onProfileSaved={() => setActiveNav("chat")} />}
           {activeNav === "chat" && (
             <>
               <div className={`${isMobile && mobileView === "chat" ? "hidden" : "flex"} ${isMobile ? "flex-1" : ""}`}>
@@ -156,8 +219,8 @@ const Index = () => {
         {renderMainContent()}
       </motion.div>
 
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
-      <CallModal open={callOpen} type={callType} convName={activeConv.name} convAvatar={activeConv.avatar} convAvatarStyle={activeConv.avatarStyle} onClose={() => setCallOpen(false)} />
+      <AuthModal open={authOpen && !user} onClose={() => setAuthOpen(false)} />
+      <CallModal open={callOpen} type={callType} convName={activeConv.name} convAvatar={activeConv.avatar} convAvatarStyle={activeConv.avatarStyle} callId={currentCallId} direction={callDirection} remoteUserId={activeConv.contactId} onClose={() => setCallOpen(false)} />
       <NotificationCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} notifications={notifications} onMarkAllRead={markAllRead} onClearAll={clearNotifications} />
       <CreateBusinessModal open={createModal.open} type={createModal.type} onClose={() => setCreateModal({ ...createModal, open: false })} />
     </div>

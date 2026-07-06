@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import ContactDiscoveryModal from "./ContactDiscoveryModal";
 
 export interface Conversation {
   id: string;
@@ -15,6 +16,8 @@ export interface Conversation {
   isOnline?: boolean;
   isSquare?: boolean;
   status?: string;
+  contactId?: string;
+  phone?: string;
 }
 
 const tabs = ["Tous", "Non lus", "Groupes", "Chaînes"];
@@ -44,6 +47,7 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
   const [contactSearch, setContactSearch] = useState("");
   const [contacts, setContacts] = useState<{ id: string; name: string; email: string }[]>([]);
   const [searchingContacts, setSearchingContacts] = useState(false);
+  const [contactsOpen, setContactsOpen] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -64,6 +68,12 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
     if (!memberships || memberships.length === 0) { setConversations([]); setLoading(false); return; }
     const convIds = memberships.map((m) => m.conversation_id);
     const { data: convData } = await supabase.from("conversations").select("*").in("id", convIds).order("updated_at", { ascending: false });
+    const { data: allMembers } = await supabase.from("conversation_members").select("conversation_id, user_id").in("conversation_id", convIds);
+    const otherIds = Array.from(new Set((allMembers || []).map((m) => m.user_id).filter((id) => id !== user.id)));
+    const { data: profiles } = otherIds.length
+      ? await supabase.from("profiles").select("id, full_name, phone, avatar_url, status, last_seen").in("id", otherIds)
+      : { data: [] as any[] };
+    const profileById = new Map((profiles || []).map((profile: any) => [profile.id, profile]));
     if (convData) {
       const convList: Conversation[] = await Promise.all(
         convData.map(async (c) => {
@@ -71,12 +81,19 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
           const { count } = await supabase.from("messages").select("*", { count: "exact", head: true }).eq("conversation_id", c.id).eq("is_read", false).neq("sender_id", user.id);
           const lastMsg = lastMsgs?.[0];
           const time = lastMsg?.created_at ? new Date(lastMsg.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
+          const otherMember = (allMembers || []).find((m) => m.conversation_id === c.id && m.user_id !== user.id);
+          const otherProfile = otherMember ? profileById.get(otherMember.user_id) : null;
+          const displayName = !c.is_group && otherProfile ? otherProfile.full_name || otherProfile.phone || c.name : c.name || "Conversation";
+          const lastSeen = otherProfile?.last_seen ? new Date(otherProfile.last_seen).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
           return {
-            id: c.id, name: c.name || "Conversation", lastMsg: lastMsg?.content || "", time,
+            id: c.id, name: displayName, lastMsg: lastMsg?.content || "", time,
             unread: count && count > 0 ? count : undefined,
-            avatar: c.name?.charAt(0)?.toUpperCase() || "💬",
+            avatar: displayName?.charAt(0)?.toUpperCase() || "💬",
             avatarStyle: c.avatar_style || "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))",
-            isOnline: false, isSquare: c.is_group || false, status: "",
+            isOnline: otherProfile?.status === "online", isSquare: c.is_group || false,
+            status: otherProfile?.status === "online" ? "Connecté" : lastSeen ? `Vu ${lastSeen}` : "",
+            contactId: otherProfile?.id,
+            phone: otherProfile?.phone,
           };
         })
       );
@@ -89,8 +106,8 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
     setContactSearch(q);
     if (q.length < 2) { setContacts([]); return; }
     setSearchingContacts(true);
-    const { data } = await supabase.from("profiles").select("id, full_name, email").ilike("full_name", `%${q}%`).limit(10);
-    setContacts((data || []).filter(p => p.id !== user?.id).map(p => ({ id: p.id, name: p.full_name, email: p.email || "" })));
+    const { data } = await supabase.from("profiles").select("id, full_name, email, phone").or(`full_name.ilike.%${q}%,phone.ilike.%${q}%`).limit(10);
+    setContacts((data || []).filter(p => p.id !== user?.id).map((p: any) => ({ id: p.id, name: p.full_name || p.phone || "Contact", email: p.phone || p.email || "" })));
     setSearchingContacts(false);
   };
 
@@ -101,9 +118,11 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
     const { data: conv, error } = await supabase.from("conversations").insert({ name, created_by: user.id, is_group: !!newConvName.trim() }).select().single();
     if (error || !conv) { toast.error("❌ Erreur de création"); return; }
 
-    await supabase.from("conversation_members").insert({ conversation_id: conv.id, user_id: user.id, role: "admin" });
+    const { error: memberError } = await supabase.from("conversation_members").insert([{ conversation_id: conv.id, user_id: user.id, role: "admin" }] as any);
+    if (memberError) { toast.error(memberError.message); return; }
     if (contactId) {
-      await supabase.from("conversation_members").insert({ conversation_id: conv.id, user_id: contactId, role: "member" });
+      const { error: contactError } = await supabase.from("conversation_members").insert({ conversation_id: conv.id, user_id: contactId, role: "member" });
+      if (contactError) { toast.error(contactError.message); return; }
     }
 
     toast.success("✅ Conversation créée!");
@@ -146,6 +165,15 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
           title="Nouvelle conversation"
         >
           +
+        </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          whileHover={{ scale: 1.05 }}
+          className="w-9 h-9 rounded-xl border border-envle-border text-base cursor-pointer flex items-center justify-center bg-foreground/[0.04]"
+          onClick={() => setContactsOpen(true)}
+          title="Détecter les contacts"
+        >
+          📇
         </motion.button>
       </motion.div>
 
@@ -300,6 +328,7 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
           </motion.div>
         )}
       </AnimatePresence>
+      <ContactDiscoveryModal open={contactsOpen} onClose={() => setContactsOpen(false)} onSelectConversation={onSelectConv} />
     </div>
   );
 };

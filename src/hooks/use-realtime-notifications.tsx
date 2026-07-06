@@ -48,7 +48,7 @@ export const useRealtimeNotifications = (userId: string | undefined, addNotifica
         const call = payload.new as { id: string; call_type?: string; status?: string };
         const body = call.call_type === "video" ? "Appel vidéo entrant" : "Appel audio entrant";
         addNotification({ id: `call-${call.id}`, type: "call", title: "Appel entrant", body, time: timeNow(), read: false, icon: "📞" });
-        playNotificationSound(localStorage.getItem("envle-ringtone") || "call");
+        playNotificationSound(localStorage.getItem("envle-ringtone") || "incoming");
         showBrowserNotification("Appel entrant", body);
         toast.info(`📞 ${body}`);
       })

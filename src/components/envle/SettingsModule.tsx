@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useTheme } from "@/hooks/use-theme";
+import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
 import QRCodeDisplay from "./QRCodeDisplay";
 
 const languages = [
@@ -47,22 +49,74 @@ export interface UserProfile {
   email: string;
   bio: string;
   avatar: string;
+  avatarUrl?: string;
+  coverUrl?: string;
   avatarStyle: string;
   location: string;
   profession: string;
 }
 
-const SettingsModule = ({ onBack, userProfile, onUpdateProfile }: Props) => {
+interface SettingsProps extends Props {
+  requireProfile?: boolean;
+  onProfileSaved?: () => void;
+}
+
+const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile = false, onProfileSaved }: SettingsProps) => {
   const { theme, toggleTheme } = useTheme();
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const { user, profile: dbProfile, refreshProfile, signOut } = useAuth();
+  const [activeSection, setActiveSection] = useState<string | null>(requireProfile ? "profile" : null);
   const [profile, setProfile] = useState(userProfile);
   const [selectedLang, setSelectedLang] = useState(getAppLanguage());
   const [showQR, setShowQR] = useState(false);
   const [autoTranslate, setAutoTranslate] = useState(localStorage.getItem("envle-auto-translate") !== "false");
 
   useEffect(() => { setProfile(userProfile); }, [userProfile]);
+  useEffect(() => { if (requireProfile) setActiveSection("profile"); }, [requireProfile]);
 
-  const saveProfile = () => { onUpdateProfile(profile); toast.success("✅ Profil mis à jour"); setActiveSection(null); };
+  const uploadProfileMedia = async (file: File, kind: "avatar" | "cover") => {
+    if (!user) { toast.error("Connectez-vous d'abord"); return; }
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `${user.id}/${kind}-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, cacheControl: "3600" });
+    if (error) { toast.error(error.message); return; }
+    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    const next = kind === "avatar" ? { ...profile, avatarUrl: data.publicUrl } : { ...profile, coverUrl: data.publicUrl };
+    setProfile(next);
+    await supabase.from("profiles").update(kind === "avatar" ? { avatar_url: data.publicUrl } : { cover_url: data.publicUrl } as any).eq("id", user.id);
+    await refreshProfile();
+    toast.success(kind === "avatar" ? "Photo de profil mise à jour" : "Photo de couverture mise à jour");
+  };
+
+  const saveProfile = async () => {
+    if (!user) { toast.error("Connectez-vous d'abord"); return; }
+    const missing = [
+      !profile.name.trim() && "nom",
+      !profile.phone.trim() && "numéro",
+      !profile.bio.trim() && "bio",
+      !profile.location.trim() && "localisation",
+      !profile.profession.trim() && "profession",
+      !profile.avatarUrl && "photo de profil",
+      !profile.coverUrl && "photo de couverture",
+    ].filter(Boolean);
+    if (missing.length) { toast.error(`Profil obligatoire incomplet: ${missing.join(", ")}`); return; }
+    const { error } = await supabase.from("profiles").update({
+      full_name: profile.name,
+      phone: profile.phone,
+      email: profile.email,
+      bio: profile.bio,
+      location: profile.location,
+      profession: profile.profession,
+      avatar_url: profile.avatarUrl,
+      cover_url: profile.coverUrl,
+      phone_changed_at: dbProfile?.phone && dbProfile.phone !== profile.phone ? new Date().toISOString() : undefined,
+    } as any).eq("id", user.id);
+    if (error) { toast.error(error.message); return; }
+    onUpdateProfile(profile);
+    await refreshProfile();
+    toast.success("✅ Profil mis à jour");
+    if (!requireProfile) setActiveSection(null);
+    onProfileSaved?.();
+  };
   const changeLang = (code: string) => { setSelectedLang(code); setAppLanguage(code); toast.success(`🌍 Langue changée: ${languages.find((l) => l.code === code)?.label}`); };
   const toggleAutoTranslate = () => { const v = !autoTranslate; setAutoTranslate(v); localStorage.setItem("envle-auto-translate", String(v)); toast.success(v ? "🌐 Traduction automatique activée" : "🌐 Traduction automatique désactivée"); };
 
@@ -134,7 +188,7 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile }: Props) => {
 
         {/* Logout */}
         <div className="px-6 pb-8">
-          <motion.button whileTap={{ scale: 0.97 }} whileHover={{ scale: 1.01 }} className="w-full py-3 rounded-xl border border-envle-rouge/30 bg-envle-rouge/10 text-envle-rouge text-sm font-semibold cursor-pointer font-body hover:bg-envle-rouge/20 transition-all" onClick={() => toast("👋 Déconnexion...")}>
+          <motion.button whileTap={{ scale: 0.97 }} whileHover={{ scale: 1.01 }} className="w-full py-3 rounded-xl border border-envle-rouge/30 bg-envle-rouge/10 text-envle-rouge text-sm font-semibold cursor-pointer font-body hover:bg-envle-rouge/20 transition-all" onClick={() => signOut()}>
             🚪 Se déconnecter
           </motion.button>
         </div>
@@ -145,14 +199,22 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile }: Props) => {
         {activeSection === "profile" && (
           <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 30 }} transition={{ type: "spring", damping: 25 }} className="absolute inset-0 z-50 bg-background flex flex-col">
             <div className="px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3">
-              <motion.button whileTap={{ scale: 0.85 }} className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center" onClick={() => setActiveSection(null)}>←</motion.button>
+              {!requireProfile && <motion.button whileTap={{ scale: 0.85 }} className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center" onClick={() => setActiveSection(null)}>←</motion.button>}
               <h3 className="font-display text-xl font-bold flex-1">Mon profil</h3>
               <motion.button whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }} className="px-4 py-2 rounded-xl border-none text-sm font-semibold cursor-pointer text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={saveProfile}>Sauvegarder</motion.button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 scrollbar-thin">
+              {requireProfile && <div className="rounded-2xl border border-envle-or/30 bg-envle-or/10 p-3 text-sm text-envle-or">Complétez votre profil pour accéder à E'nvlé One.</div>}
+              <label className="relative h-28 rounded-2xl border border-envle-border overflow-hidden cursor-pointer bg-foreground/[0.06] flex items-center justify-center">
+                {profile.coverUrl ? <img src={profile.coverUrl} alt="Couverture" className="absolute inset-0 w-full h-full object-cover" /> : <span className="text-xs text-envle-text-muted">Ajouter une photo de couverture obligatoire</span>}
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadProfileMedia(e.target.files[0], "cover")} />
+              </label>
               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-3 mb-4">
-                <motion.div whileHover={{ scale: 1.08, rotate: 3 }} className="w-24 h-24 rounded-full flex items-center justify-center text-4xl font-bold border-3 border-primary" style={{ background: profile.avatarStyle }}>{profile.avatar}</motion.div>
-                <motion.button whileTap={{ scale: 0.9 }} className="text-xs text-primary font-semibold border-none bg-transparent cursor-pointer font-body" onClick={() => toast("📷 Changer la photo de profil")}>📷 Changer la photo</motion.button>
+                <label className="w-24 h-24 rounded-full flex items-center justify-center text-4xl font-bold border-4 border-primary overflow-hidden cursor-pointer" style={{ background: profile.avatarStyle }}>
+                  {profile.avatarUrl ? <img src={profile.avatarUrl} alt="Photo profil" className="w-full h-full object-cover" /> : profile.avatar}
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadProfileMedia(e.target.files[0], "avatar")} />
+                </label>
+                <span className="text-xs text-primary font-semibold">📷 Photo de profil obligatoire</span>
               </motion.div>
               {[
                 { key: "name", label: "Nom complet", placeholder: "Votre nom" },

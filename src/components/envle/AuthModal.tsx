@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useState, useEffect, useRef } from "react";
 import type { KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -25,6 +26,8 @@ const countries = [
 ];
 
 const AuthModal = ({ open, onClose }: Props) => {
+  const { user } = useAuth();
+  useEffect(() => { if (user && open) onClose(); }, [user, open, onClose]);
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [countryCode, setCountryCode] = useState(countries[0].code);
   const [phone, setPhone] = useState("");
