@@ -45,7 +45,7 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
   const [showNewConv, setShowNewConv] = useState(false);
   const [newConvName, setNewConvName] = useState("");
   const [contactSearch, setContactSearch] = useState("");
-  const [contacts, setContacts] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [contacts, setContacts] = useState<{ id: string; name: string; email: string; avatarUrl?: string | null; isOnline?: boolean }[]>([]);
   const [searchingContacts, setSearchingContacts] = useState(false);
   const [contactsOpen, setContactsOpen] = useState(false);
   const { user } = useAuth();
@@ -106,8 +106,12 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
     setContactSearch(q);
     if (q.length < 2) { setContacts([]); return; }
     setSearchingContacts(true);
-    const { data } = await supabase.from("profiles").select("id, full_name, email, phone").or(`full_name.ilike.%${q}%,phone.ilike.%${q}%`).limit(10);
-    setContacts((data || []).filter(p => p.id !== user?.id).map((p: any) => ({ id: p.id, name: p.full_name || p.phone || "Contact", email: p.phone || p.email || "" })));
+    const safe = q.replace(/[%,()]/g, "");
+    const normalized = safe.replace(/[^+\d]/g, "");
+    const filters = [`full_name.ilike.%${safe}%`, `phone.ilike.%${safe}%`];
+    if (normalized.length >= 2) filters.push(`searchable_phone.ilike.%${normalized}%`);
+    const { data } = await supabase.from("profiles").select("id, full_name, email, phone, avatar_url, status").or(filters.join(",")).limit(12);
+    setContacts((data || []).filter(p => p.id !== user?.id).map((p: any) => ({ id: p.id, name: p.full_name || p.phone || "Contact", email: p.phone || p.email || "", avatarUrl: p.avatar_url, isOnline: p.status === "online" })));
     setSearchingContacts(false);
   };
 
@@ -304,9 +308,9 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
                       className="flex items-center gap-3 px-3 py-2.5 rounded-xl border-none bg-foreground/[0.04] hover:bg-primary/10 cursor-pointer w-full text-left transition-colors"
                       onClick={() => createConversation(c.id)}
                     >
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">{c.name[0]}</div>
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold overflow-hidden relative">{c.avatarUrl ? <img src={c.avatarUrl} alt={c.name} className="w-full h-full object-cover" /> : c.name[0]}{c.isOnline && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-primary border border-envle-card" />}</div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold">{c.name}</div>
+                        <div className="text-sm font-semibold">{c.name} <span className="text-primary text-[10px]">◉</span></div>
                         <div className="text-[11px] text-envle-text-muted truncate">{c.email}</div>
                       </div>
                     </motion.button>

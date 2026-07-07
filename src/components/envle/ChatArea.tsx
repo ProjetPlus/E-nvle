@@ -285,7 +285,7 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
         <motion.div whileHover={{ scale: 1.05 }} className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-base" style={{ background: conv.avatarStyle }}>{conv.avatar}</motion.div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-bold truncate">{conv.name}</div>
-          <div className="text-[11px] text-envle-text-muted">Shift+Entrée pour envoyer</div>
+          <div className="text-[11px] text-envle-text-muted truncate">{conv.status || "Sélectionnez une discussion"}</div>
         </div>
         <div className="flex gap-1">
           {["🤖", "📞", "📹", "🔍"].map((icon, i) => (

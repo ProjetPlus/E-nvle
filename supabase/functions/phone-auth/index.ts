@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     await supabase.from("profiles").upsert({
       id: userId,
       phone,
-      email,
+      email: null,
       full_name: parsed.data.fullName?.trim() || `Utilisateur ${phone.slice(-4)}`,
       username: `envle_${phone.slice(-6)}`,
       status: "online",

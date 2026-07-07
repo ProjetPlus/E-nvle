@@ -10,6 +10,7 @@ import { isValidPhone, normalizePhone, phoneToDisplayName } from "@/lib/phone";
 interface Props {
   open: boolean;
   onClose: () => void;
+  locked?: boolean;
 }
 
 const countries = [
@@ -25,7 +26,7 @@ const countries = [
   { flag: "🇬🇭", code: "+233", label: "Ghana" },
 ];
 
-const AuthModal = ({ open, onClose }: Props) => {
+const AuthModal = ({ open, onClose, locked = false }: Props) => {
   const { user } = useAuth();
   useEffect(() => { if (user && open) onClose(); }, [user, open, onClose]);
   const [step, setStep] = useState<"phone" | "otp">("phone");
@@ -84,7 +85,7 @@ const AuthModal = ({ open, onClose }: Props) => {
       toast.error(signError.message);
       return;
     }
-    toast.success("✅ Connecté comme WhatsApp");
+    toast.success("✅ Connexion réussie");
     resetForm();
     onClose();
   };
@@ -115,7 +116,7 @@ const AuthModal = ({ open, onClose }: Props) => {
   return (
     <AnimatePresence>
       {open && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3" onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3" onClick={(e) => e.target === e.currentTarget && !locked && onClose()}>
           <motion.div initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.92, y: 20 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} className="bg-envle-card border border-envle-border rounded-3xl p-6 md:p-8 w-[480px] max-w-[95vw]">
             <div className="flex flex-col items-center mb-5">
               <motion.img src={envleLogo} alt="E'nvlé" className="w-16 h-16 object-contain mb-3" initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.1, type: "spring" }} />

@@ -14,69 +14,122 @@ export type Database = {
   }
   public: {
     Tables: {
+      call_signals: {
+        Row: {
+          call_id: string
+          created_at: string
+          id: string
+          payload: Json
+          recipient_id: string
+          sender_id: string
+          signal_type: string
+        }
+        Insert: {
+          call_id: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          recipient_id: string
+          sender_id: string
+          signal_type: string
+        }
+        Update: {
+          call_id?: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          recipient_id?: string
+          sender_id?: string
+          signal_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_signals_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calls: {
         Row: {
           answered_at: string | null
           call_type: string | null
           callee_id: string | null
           callee_muted: boolean | null
+          callee_presence: string | null
           callee_video_enabled: boolean | null
           caller_id: string
           caller_muted: boolean | null
+          caller_presence: string | null
           caller_video_enabled: boolean | null
           conversation_id: string | null
           duration: number | null
           ended_at: string | null
           id: string
           is_group: boolean | null
+          last_signal_at: string | null
+          media_ready: boolean | null
           participants: Json | null
           quality_mode: string | null
           recording_url: string | null
           ring_state: string | null
           started_at: string | null
           status: string | null
+          stun_turn_config: Json | null
         }
         Insert: {
           answered_at?: string | null
           call_type?: string | null
           callee_id?: string | null
           callee_muted?: boolean | null
+          callee_presence?: string | null
           callee_video_enabled?: boolean | null
           caller_id: string
           caller_muted?: boolean | null
+          caller_presence?: string | null
           caller_video_enabled?: boolean | null
           conversation_id?: string | null
           duration?: number | null
           ended_at?: string | null
           id?: string
           is_group?: boolean | null
+          last_signal_at?: string | null
+          media_ready?: boolean | null
           participants?: Json | null
           quality_mode?: string | null
           recording_url?: string | null
           ring_state?: string | null
           started_at?: string | null
           status?: string | null
+          stun_turn_config?: Json | null
         }
         Update: {
           answered_at?: string | null
           call_type?: string | null
           callee_id?: string | null
           callee_muted?: boolean | null
+          callee_presence?: string | null
           callee_video_enabled?: boolean | null
           caller_id?: string
           caller_muted?: boolean | null
+          caller_presence?: string | null
           caller_video_enabled?: boolean | null
           conversation_id?: string | null
           duration?: number | null
           ended_at?: string | null
           id?: string
           is_group?: boolean | null
+          last_signal_at?: string | null
+          media_ready?: boolean | null
           participants?: Json | null
           quality_mode?: string | null
           recording_url?: string | null
           ring_state?: string | null
           started_at?: string | null
           status?: string | null
+          stun_turn_config?: Json | null
         }
         Relationships: [
           {
