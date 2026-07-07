@@ -5,6 +5,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import QRCodeDisplay from "./QRCodeDisplay";
+import { processProfileImage } from "@/lib/image-processing";
 
 const languages = [
   { code: "fr", label: "Français", flag: "🇫🇷" },
@@ -69,15 +70,23 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
   const [selectedLang, setSelectedLang] = useState(getAppLanguage());
   const [showQR, setShowQR] = useState(false);
   const [autoTranslate, setAutoTranslate] = useState(localStorage.getItem("envle-auto-translate") !== "false");
+  const draftKey = user ? `envle-profile-draft-${user.id}` : "envle-profile-draft";
 
-  useEffect(() => { setProfile(userProfile); }, [userProfile]);
+  useEffect(() => {
+    const draft = localStorage.getItem(draftKey);
+    setProfile(draft ? { ...userProfile, ...JSON.parse(draft) } : userProfile);
+  }, [userProfile, draftKey]);
   useEffect(() => { if (requireProfile) setActiveSection("profile"); }, [requireProfile]);
+  useEffect(() => {
+    if (!user) return;
+    localStorage.setItem(draftKey, JSON.stringify(profile));
+  }, [draftKey, profile, user]);
 
   const uploadProfileMedia = async (file: File, kind: "avatar" | "cover") => {
     if (!user) { toast.error("Connectez-vous d'abord"); return; }
-    const ext = file.name.split(".").pop() || "jpg";
-    const path = `${user.id}/${kind}-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true, cacheControl: "3600" });
+    const processed = await processProfileImage(file, kind);
+    const path = `${user.id}/${kind}-${Date.now()}.jpg`;
+    const { error } = await supabase.storage.from("avatars").upload(path, processed, { upsert: true, cacheControl: "3600", contentType: "image/jpeg" });
     if (error) { toast.error(error.message); return; }
     const { data } = supabase.storage.from("avatars").getPublicUrl(path);
     const next = kind === "avatar" ? { ...profile, avatarUrl: data.publicUrl } : { ...profile, coverUrl: data.publicUrl };
@@ -92,9 +101,8 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
     const missing = [
       !profile.name.trim() && "nom",
       !profile.phone.trim() && "numéro",
-      !profile.bio.trim() && "bio",
-      !profile.location.trim() && "localisation",
-      !profile.profession.trim() && "profession",
+      !profile.location.trim() && "ville",
+      !profile.profession.trim() && "activité",
       !profile.avatarUrl && "photo de profil",
       !profile.coverUrl && "photo de couverture",
     ].filter(Boolean);
@@ -102,8 +110,8 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
     const { error } = await supabase.from("profiles").update({
       full_name: profile.name,
       phone: profile.phone,
-      email: profile.email,
-      bio: profile.bio,
+      email: profile.email.trim() || null,
+      bio: profile.bio || null,
       location: profile.location,
       profession: profile.profession,
       avatar_url: profile.avatarUrl,
@@ -113,6 +121,7 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
     if (error) { toast.error(error.message); return; }
     onUpdateProfile(profile);
     await refreshProfile();
+    localStorage.removeItem(draftKey);
     toast.success("✅ Profil mis à jour");
     if (!requireProfile) setActiveSection(null);
     onProfileSaved?.();
@@ -151,7 +160,7 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
           className="mx-6 mt-6 bg-envle-card border border-envle-border rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:border-primary/30 transition-all"
           onClick={() => setActiveSection("profile")}
         >
-          <motion.div whileHover={{ scale: 1.08, rotate: 3 }} className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold border-2 border-primary" style={{ background: profile.avatarStyle }}>{profile.avatar}</motion.div>
+          <motion.div whileHover={{ scale: 1.08, rotate: 3 }} className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold border-2 border-primary overflow-hidden" style={{ background: profile.avatarStyle }}>{profile.avatarUrl ? <img src={profile.avatarUrl} alt="Profil" className="w-full h-full object-cover" /> : profile.avatar}</motion.div>
           <div className="flex-1">
             <div className="text-lg font-bold">{profile.name}</div>
             <div className="text-xs text-envle-text-muted">{profile.bio}</div>
@@ -205,8 +214,9 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
             </div>
             <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 scrollbar-thin">
               {requireProfile && <div className="rounded-2xl border border-envle-or/30 bg-envle-or/10 p-3 text-sm text-envle-or">Complétez votre profil pour accéder à E'nvlé One.</div>}
-              <label className="relative h-28 rounded-2xl border border-envle-border overflow-hidden cursor-pointer bg-foreground/[0.06] flex items-center justify-center">
-                {profile.coverUrl ? <img src={profile.coverUrl} alt="Couverture" className="absolute inset-0 w-full h-full object-cover" /> : <span className="text-xs text-envle-text-muted">Ajouter une photo de couverture obligatoire</span>}
+              <label className="relative h-32 rounded-2xl border border-envle-border overflow-hidden cursor-pointer bg-foreground/[0.06] flex items-center justify-center group">
+                {profile.coverUrl ? <img src={profile.coverUrl} alt="Couverture" className="absolute inset-0 w-full h-full object-cover" /> : <span className="text-xs text-envle-text-muted">Photo de couverture obligatoire</span>}
+                <span className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-background/80 border border-envle-border text-xs font-semibold">📷 Importer</span>
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadProfileMedia(e.target.files[0], "cover")} />
               </label>
               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-3 mb-4">
@@ -214,14 +224,14 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
                   {profile.avatarUrl ? <img src={profile.avatarUrl} alt="Photo profil" className="w-full h-full object-cover" /> : profile.avatar}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadProfileMedia(e.target.files[0], "avatar")} />
                 </label>
-                <span className="text-xs text-primary font-semibold">📷 Photo de profil obligatoire</span>
+                <span className="text-xs text-primary font-semibold">📷 Importer une photo de profil obligatoire</span>
               </motion.div>
               {[
                 { key: "name", label: "Nom complet", placeholder: "Votre nom" },
                 { key: "phone", label: "Téléphone", placeholder: "+225 XX XX XX XX" },
-                { key: "email", label: "Email", placeholder: "votre@email.com" },
-                { key: "profession", label: "Profession", placeholder: "Votre profession" },
-                { key: "location", label: "Localisation", placeholder: "Ville, Pays" },
+                { key: "email", label: "Email", placeholder: "Optionnel" },
+                { key: "profession", label: "Profession / activité", placeholder: "Votre activité" },
+                { key: "location", label: "Ville", placeholder: "Votre ville" },
               ].map((field, i) => (
                 <motion.div key={field.key} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
                   <label className="text-xs text-envle-text-muted font-semibold block mb-1.5">{field.label}</label>

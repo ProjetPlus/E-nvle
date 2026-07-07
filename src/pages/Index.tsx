@@ -66,6 +66,7 @@ const Index = () => {
   const [callType, setCallType] = useState("video");
   const [currentCallId, setCurrentCallId] = useState<string | undefined>();
   const [callDirection, setCallDirection] = useState<"incoming" | "outgoing" | "meeting">("meeting");
+  const [callPeer, setCallPeer] = useState<Conversation | null>(null);
   const [mobileView, setMobileView] = useState<"list" | "chat">("list");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -105,8 +106,21 @@ const Index = () => {
     if (!user) return;
     const channel = supabase
       .channel(`calls-live-${user.id}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "calls", filter: `callee_id=eq.${user.id}` }, (payload) => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "calls", filter: `callee_id=eq.${user.id}` }, async (payload) => {
         const call = payload.new as any;
+        if (!["ringing", "dialing"].includes(call.status || "")) return;
+        const { data: caller } = await supabase.from("profiles").select("id, full_name, phone, avatar_url, status, last_seen").eq("id", call.caller_id).maybeSingle();
+        const name = caller?.full_name || caller?.phone || "Appel entrant";
+        setCallPeer({
+          id: call.conversation_id || "",
+          name,
+          lastMsg: "",
+          time: "",
+          avatar: caller?.avatar_url ? "" : name.charAt(0).toUpperCase(),
+          avatarStyle: emptyConv.avatarStyle,
+          contactId: call.caller_id,
+          status: caller?.status === "online" ? "Connecté" : caller?.last_seen ? `Dernière connexion ${new Date(caller.last_seen).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}` : "",
+        });
         setCurrentCallId(call.id);
         setCallDirection("incoming");
         setCallType(call.call_type || "audio");
@@ -124,6 +138,7 @@ const Index = () => {
   const openCall = useCallback(async (type = "video") => {
     setCallType(type);
     setCallDirection(activeConv.contactId ? "outgoing" : "meeting");
+    setCallPeer(activeConv.contactId ? activeConv : null);
     setCurrentCallId(undefined);
     if (user && activeConv.contactId) {
       const stopTone = playLoopingSound("outgoing");
@@ -139,6 +154,7 @@ const Index = () => {
       if (error) { toast.error(error.message); return; }
       setCurrentCallId(data.id);
     }
+    if (user && !activeConv.contactId) toast("Sélectionnez un contact pour lancer un appel réel");
     setCallOpen(true);
   }, [activeConv.contactId, activeConv.id, user]);
 
@@ -159,7 +175,7 @@ const Index = () => {
   const renderMainContent = () => {
     const goChat = () => setActiveNav("chat");
     if (authLoading) return <div className="flex-1 grid place-items-center bg-background text-envle-text-muted">Chargement...</div>;
-    if (!user) return <div className="flex-1 grid place-items-center bg-background text-center px-6"><button className="px-5 py-3 rounded-2xl bg-primary text-primary-foreground font-semibold" onClick={() => setAuthOpen(true)}>Se connecter</button></div>;
+    if (!user) return <div className="flex-1 bg-background" />;
 
     return (
       <AnimatePresence mode="wait">
@@ -193,7 +209,7 @@ const Index = () => {
       {showSplash && <SplashScreen onFinish={handleSplashFinish} />}
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: appVisible ? 1 : 0 }} transition={{ duration: 0.5 }} className="flex h-screen">
-        <Sidebar
+        {user && <Sidebar
           activeNav={activeNav}
           onNavChange={handleNavChange}
           onOpenAuth={() => setAuthOpen(true)}
@@ -203,9 +219,10 @@ const Index = () => {
           onClose={() => setSidebarOpen(false)}
           unreadNotifications={unreadCount}
           userInitials={userInitials}
-        />
+          userAvatarUrl={profile?.avatar_url || ""}
+        />}
 
-        {isMobile && appVisible && (
+        {user && isMobile && appVisible && (
           <motion.button
             whileTap={{ scale: 0.85 }}
             whileHover={{ scale: 1.05 }}
@@ -219,8 +236,8 @@ const Index = () => {
         {renderMainContent()}
       </motion.div>
 
-      <AuthModal open={authOpen && !user} onClose={() => setAuthOpen(false)} />
-      <CallModal open={callOpen} type={callType} convName={activeConv.name} convAvatar={activeConv.avatar} convAvatarStyle={activeConv.avatarStyle} callId={currentCallId} direction={callDirection} remoteUserId={activeConv.contactId} onClose={() => setCallOpen(false)} />
+      <AuthModal open={!authLoading && authOpen && !user} locked onClose={() => setAuthOpen(false)} />
+      <CallModal open={callOpen} type={callType} convName={callPeer?.name || activeConv.name} convAvatar={callPeer?.avatar || activeConv.avatar} convAvatarStyle={callPeer?.avatarStyle || activeConv.avatarStyle} callId={currentCallId} direction={callDirection} remoteUserId={callDirection === "incoming" ? callPeer?.contactId : activeConv.contactId} onClose={() => setCallOpen(false)} />
       <NotificationCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} notifications={notifications} onMarkAllRead={markAllRead} onClearAll={clearNotifications} />
       <CreateBusinessModal open={createModal.open} type={createModal.type} onClose={() => setCreateModal({ ...createModal, open: false })} />
     </div>
