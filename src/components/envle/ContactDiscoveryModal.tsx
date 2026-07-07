@@ -7,7 +7,8 @@ import { normalizePhone } from "@/lib/phone";
 import type { Conversation } from "./ConversationPanel";
 
 type NativeContact = { name?: string[]; tel?: string[] };
-type MatchedContact = { id: string; name: string; phone: string; avatarUrl?: string | null; status?: string | null; lastSeen?: string | null };
+type ImportedContact = { name: string; phone: string; registered?: MatchedContact };
+type MatchedContact = { id: string; name: string; phone: string; avatarUrl?: string | null; status?: string | null; lastSeen?: string | null; sourceName?: string };
 
 type ContactNavigator = Navigator & {
   contacts?: {
@@ -41,29 +42,44 @@ const ContactDiscoveryModal = ({ open, onClose, onSelectConversation }: Props) =
   const { user } = useAuth();
   const [manualList, setManualList] = useState("");
   const [matches, setMatches] = useState<MatchedContact[]>([]);
+  const [importedContacts, setImportedContacts] = useState<ImportedContact[]>([]);
+  const [contactQuery, setContactQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const canUseNativeContacts = useMemo(() => Boolean((navigator as ContactNavigator).contacts?.select), []);
 
-  const findRegisteredProfiles = async (phones: string[]) => {
+  const findRegisteredProfiles = async (phones: string[], names = new Map<string, string>()) => {
     if (!user || phones.length === 0) { setMatches([]); return; }
     setLoading(true);
-    const { data, error } = await supabase
+    const normalizedPhones = Array.from(new Set(phones.map(normalizePhone).filter((phone) => /^\+?\d{8,15}$/.test(phone))));
+    const [{ data: bySearch, error }, { data: byPhone }] = await Promise.all([
+      supabase
       .from("profiles")
       .select("id, full_name, phone, avatar_url, status, last_seen")
-      .in("phone", phones)
+        .in("searchable_phone", normalizedPhones)
+        .neq("id", user.id)
+        .limit(200),
+      supabase
+        .from("profiles")
+        .select("id, full_name, phone, avatar_url, status, last_seen")
+        .in("phone", normalizedPhones)
       .neq("id", user.id)
-      .limit(200);
+        .limit(200),
+    ]);
     setLoading(false);
     if (error) { toast.error(`Contacts indisponibles: ${error.message}`); return; }
-    const registered = (data || []).map((profile: any) => ({
+    const unique = new Map<string, any>();
+    [...(bySearch || []), ...(byPhone || [])].forEach((profile: any) => unique.set(profile.id, profile));
+    const registered = Array.from(unique.values()).map((profile: any) => ({
       id: profile.id,
       name: profile.full_name || profile.phone || "Contact E'nvlé",
       phone: profile.phone || "",
       avatarUrl: profile.avatar_url,
       status: profile.status,
       lastSeen: profile.last_seen,
+      sourceName: names.get(normalizePhone(profile.phone || "")),
     }));
     setMatches(registered);
+    setImportedContacts((prev) => prev.map((contact) => ({ ...contact, registered: registered.find((match) => normalizePhone(match.phone) === contact.phone) })));
     if (registered.length === 0) toast("Aucun contact inscrit trouvé dans cette liste");
   };
 
@@ -74,14 +90,22 @@ const ContactDiscoveryModal = ({ open, onClose, onSelectConversation }: Props) =
     }
     try {
       const contacts = await (navigator as ContactNavigator).contacts!.select(["name", "tel"], { multiple: true });
-      const phones = Array.from(new Set(contacts.flatMap((contact) => contact.tel || []).map(normalizePhone).filter(Boolean)));
-      await findRegisteredProfiles(phones);
+      const imported = contacts.flatMap((contact) => (contact.tel || []).map((tel) => ({ name: contact.name?.[0] || tel, phone: normalizePhone(tel) }))).filter((contact) => /^\+?\d{8,15}$/.test(contact.phone));
+      const unique = Array.from(new Map(imported.map((contact) => [contact.phone, contact])).values());
+      const names = new Map(unique.map((contact) => [contact.phone, contact.name]));
+      setImportedContacts(unique);
+      await findRegisteredProfiles(unique.map((contact) => contact.phone), names);
     } catch {
       toast("Accès au répertoire annulé");
     }
   };
 
-  const syncManualContacts = () => findRegisteredProfiles(parseManualPhones(manualList));
+  const syncManualContacts = () => {
+    const phones = parseManualPhones(manualList);
+    const imported = phones.map((phone) => ({ name: phone, phone }));
+    setImportedContacts(imported);
+    void findRegisteredProfiles(phones, new Map(imported.map((contact) => [contact.phone, contact.name])));
+  };
 
   const startConversation = async (contact: MatchedContact) => {
     if (!user) { toast.error("Connectez-vous d'abord"); return; }
@@ -127,6 +151,12 @@ const ContactDiscoveryModal = ({ open, onClose, onSelectConversation }: Props) =
     onClose();
   };
 
+  const visibleContacts = importedContacts.filter((contact) => {
+    const q = contactQuery.toLowerCase().trim();
+    if (!q) return true;
+    return contact.name.toLowerCase().includes(q) || contact.phone.includes(q);
+  });
+
   return (
     <AnimatePresence>
       {open && (
@@ -149,13 +179,28 @@ const ContactDiscoveryModal = ({ open, onClose, onSelectConversation }: Props) =
               <textarea value={manualList} onChange={(e) => setManualList(e.target.value)} className="mt-4 w-full min-h-[110px] bg-foreground/[0.06] border border-envle-border rounded-2xl p-3 text-sm outline-none focus:border-primary resize-none" placeholder={"Coller des numéros, un par ligne\n+2250700000000\n+221770000000"} />
               <button className="mt-2 w-full py-2.5 rounded-xl border border-envle-border bg-transparent text-sm font-semibold cursor-pointer" onClick={syncManualContacts} disabled={loading}>🔎 Filtrer les inscrits</button>
 
+              {importedContacts.length > 0 && (
+                <div className="mt-4 rounded-2xl border border-envle-border bg-foreground/[0.03] p-3">
+                  <input value={contactQuery} onChange={(e) => setContactQuery(e.target.value)} className="w-full bg-foreground/[0.06] border border-envle-border rounded-xl px-3 py-2 text-sm outline-none focus:border-primary" placeholder="Rechercher par nom ou numéro" />
+                  <div className="mt-3 max-h-48 overflow-y-auto scrollbar-thin flex flex-col gap-1">
+                    {visibleContacts.map((contact) => (
+                      <button key={contact.phone} className="flex items-center gap-3 p-2 rounded-xl border-none bg-transparent hover:bg-primary/10 cursor-pointer text-left" onClick={() => contact.registered && startConversation(contact.registered)} disabled={!contact.registered}>
+                        <span className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-xs">{contact.registered ? "◉" : "○"}</span>
+                        <span className="flex-1 min-w-0"><span className="block text-sm font-semibold truncate">{contact.name}</span><span className="block text-[11px] text-envle-text-muted truncate">{contact.phone}</span></span>
+                        <span className={contact.registered ? "text-primary text-xs font-bold" : "text-envle-text-muted text-xs"}>{contact.registered ? "E'nvlé" : "Inviter"}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="mt-5 flex flex-col gap-2">
                 {loading && <p className="text-sm text-envle-text-muted text-center py-4">Recherche...</p>}
                 {!loading && matches.map((contact) => (
                   <motion.button key={contact.id} whileTap={{ scale: 0.98 }} whileHover={{ x: 3 }} className="flex items-center gap-3 p-3 rounded-2xl border border-envle-border bg-foreground/[0.03] cursor-pointer text-left" onClick={() => startConversation(contact)}>
                     <div className="w-11 h-11 rounded-full bg-primary/20 flex items-center justify-center font-bold overflow-hidden">{contact.avatarUrl ? <img src={contact.avatarUrl} alt={contact.name} className="w-full h-full object-cover" /> : contact.name.charAt(0)}</div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold truncate">{contact.name}</div>
+                      <div className="text-sm font-bold truncate">{contact.sourceName || contact.name}</div>
                       <div className="text-xs text-envle-text-muted truncate">{contact.phone} · {relativeStatus(contact.lastSeen, contact.status)}</div>
                     </div>
                     <span className="text-primary">➤</span>
