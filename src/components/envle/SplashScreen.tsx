@@ -43,7 +43,7 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.6 }}
-          className="font-display text-3xl font-bold text-white -mt-2"
+          className="font-display text-3xl font-bold text-foreground -mt-2 drop-shadow-sm"
         >
           E'nvlé <span style={{ color: "hsl(45 90% 60%)" }}>One</span>
         </motion.h1>

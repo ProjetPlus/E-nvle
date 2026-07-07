@@ -44,10 +44,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    // Initial session check
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
-      const activeUser = session?.user ?? null;
+      const { data: verified } = session ? await supabase.auth.getUser() : { data: { user: null } };
+      const activeUser = verified.user ?? null;
       setUser(activeUser);
       await loadProfile(activeUser?.id);
       setLoading(false);
@@ -65,7 +65,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadProfile]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const setOnline = () => supabase.from("profiles").update({ status: document.hidden ? "away" : "online", last_seen: new Date().toISOString() }).eq("id", user.id).then(() => {});
+    const setOffline = () => supabase.from("profiles").update({ status: "offline", last_seen: new Date().toISOString() }).eq("id", user.id).then(() => {});
+    void setOnline();
+    const heartbeat = window.setInterval(setOnline, 45_000);
+    document.addEventListener("visibilitychange", setOnline);
+    window.addEventListener("beforeunload", setOffline);
+    return () => {
+      window.clearInterval(heartbeat);
+      document.removeEventListener("visibilitychange", setOnline);
+      window.removeEventListener("beforeunload", setOffline);
+      void setOffline();
+    };
+  }, [user?.id]);
 
   const signOut = useCallback(async () => {
     if (user?.id) await supabase.from("profiles").update({ status: "offline", last_seen: new Date().toISOString() }).eq("id", user.id);
