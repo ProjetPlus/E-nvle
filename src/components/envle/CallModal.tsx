@@ -349,7 +349,7 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
               { icon: "👥", onClick: () => setShowParticipants(!showParticipants), title: "Participants" },
               ...(direction === "outgoing" && callStatus === "Ça sonne..." ? [{ icon: "📵", onClick: markRemoteUnavailable, title: "Marquer injoignable", danger: true }] : []),
             ].map((btn) => (
-              <button key={btn.title} className={`w-13 h-13 md:w-14 md:h-14 rounded-full border-none text-xl cursor-pointer flex items-center justify-center transition-all ${(btn as any).danger ? "bg-envle-rouge text-primary-foreground" : (btn as any).primary ? "bg-primary text-primary-foreground" : "bg-foreground/15 text-primary-foreground"}`} onClick={btn.onClick} title={btn.title}>{btn.icon}</button>
+              <button key={btn.title} className={`w-14 h-14 rounded-full border-none text-xl cursor-pointer flex items-center justify-center transition-all ${(btn as any).danger ? "bg-envle-rouge text-primary-foreground" : (btn as any).primary ? "bg-primary text-primary-foreground" : "bg-foreground/15 text-primary-foreground"}`} onClick={btn.onClick} title={btn.title}>{btn.icon}</button>
             ))}
             <button className="w-16 h-16 rounded-full border-none text-2xl cursor-pointer flex items-center justify-center bg-envle-rouge text-primary-foreground shadow-lg" onClick={() => handleClose()} title="Raccrocher">📵</button>
           </motion.div>
