@@ -221,11 +221,8 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
           activeNav={activeNav}
           onNavChange={handleNavChange}
           onOpenAuth={() => setAuthOpen(true)}
-          onOpenCall={() => openCall()}
-          onOpenNotifications={() => setNotificationsOpen(true)}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-          unreadNotifications={unreadCount}
           userInitials={userInitials}
           userAvatarUrl={profile?.avatar_url || ""}
         />}

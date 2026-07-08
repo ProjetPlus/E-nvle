@@ -456,6 +456,183 @@ CREATE TRIGGER on_auth_user_created
 
 ---
 
+## 2. Patch SQL final — sessions, WebRTC, conversations, éphémère
+
+> À exécuter manuellement après le SQL principal si ce n'est pas déjà fait. N'exécute aucun secret côté client.
+
+```sql
+-- E'nvlé One — patch final routage/session/conversations/appels
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Profils retrouvables durablement, avec email facultatif côté UI
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS cover_url text,
+  ADD COLUMN IF NOT EXISTS profile_completed boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS searchable_phone text,
+  ADD COLUMN IF NOT EXISTS notification_sound text DEFAULT 'default',
+  ADD COLUMN IF NOT EXISTS ringtone text DEFAULT 'incoming',
+  ADD COLUMN IF NOT EXISTS push_enabled boolean DEFAULT true;
+
+GRANT SELECT ON public.profiles TO anon, authenticated;
+GRANT INSERT, UPDATE ON public.profiles TO authenticated;
+GRANT ALL ON public.profiles TO service_role;
+
+CREATE OR REPLACE FUNCTION public.set_profile_completion()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  NEW.profile_completed := (
+    coalesce(trim(NEW.full_name), '') <> ''
+    AND coalesce(trim(NEW.phone), '') <> ''
+    AND coalesce(trim(NEW.location), '') <> ''
+    AND coalesce(trim(NEW.profession), '') <> ''
+    AND coalesce(trim(NEW.avatar_url), '') <> ''
+    AND coalesce(trim(NEW.cover_url), '') <> ''
+  );
+  NEW.searchable_phone := regexp_replace(coalesce(NEW.phone, ''), '[^+0-9]', '', 'g');
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_profiles_completion ON public.profiles;
+CREATE TRIGGER trg_profiles_completion
+BEFORE INSERT OR UPDATE ON public.profiles
+FOR EACH ROW EXECUTE FUNCTION public.set_profile_completion();
+
+CREATE INDEX IF NOT EXISTS profiles_searchable_phone_idx ON public.profiles(searchable_phone);
+CREATE INDEX IF NOT EXISTS profiles_name_phone_idx ON public.profiles(full_name, phone);
+
+-- Appareils : 1 actif par défaut, ajout second appareil via QR côté UI
+CREATE TABLE IF NOT EXISTS public.user_devices (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  device_name text NOT NULL,
+  device_type text DEFAULT 'desktop',
+  is_current boolean DEFAULT false,
+  last_active timestamptz DEFAULT now(),
+  created_at timestamptz DEFAULT now()
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_devices TO authenticated;
+GRANT ALL ON public.user_devices TO service_role;
+ALTER TABLE public.user_devices ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS dev_own ON public.user_devices;
+CREATE POLICY dev_own ON public.user_devices FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+CREATE UNIQUE INDEX IF NOT EXISTS user_devices_one_current_idx ON public.user_devices(user_id) WHERE is_current = true;
+
+-- Conversations/messages : CRUD réel + éphémère
+ALTER TABLE public.conversations ADD COLUMN IF NOT EXISTS ephemeral_ttl integer DEFAULT 0;
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS expires_at timestamptz;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.conversations, public.conversation_members, public.messages, public.contacts TO authenticated;
+GRANT ALL ON public.conversations, public.conversation_members, public.messages, public.contacts TO service_role;
+
+CREATE OR REPLACE FUNCTION public.is_conversation_member(_conv uuid, _user uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  SELECT EXISTS(SELECT 1 FROM public.conversation_members WHERE conversation_id = _conv AND user_id = _user);
+$$;
+
+ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversation_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS conv_member_read ON public.conversations;
+CREATE POLICY conv_member_read ON public.conversations FOR SELECT TO authenticated USING (public.is_conversation_member(id, auth.uid()));
+DROP POLICY IF EXISTS conv_create ON public.conversations;
+CREATE POLICY conv_create ON public.conversations FOR INSERT TO authenticated WITH CHECK (created_by = auth.uid());
+DROP POLICY IF EXISTS conv_update_member ON public.conversations;
+CREATE POLICY conv_update_member ON public.conversations FOR UPDATE TO authenticated USING (public.is_conversation_member(id, auth.uid())) WITH CHECK (public.is_conversation_member(id, auth.uid()));
+
+DROP POLICY IF EXISTS cm_read ON public.conversation_members;
+CREATE POLICY cm_read ON public.conversation_members FOR SELECT TO authenticated USING (public.is_conversation_member(conversation_id, auth.uid()));
+DROP POLICY IF EXISTS cm_insert ON public.conversation_members;
+CREATE POLICY cm_insert ON public.conversation_members FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid() OR public.is_conversation_member(conversation_id, auth.uid()));
+DROP POLICY IF EXISTS cm_update_self ON public.conversation_members;
+CREATE POLICY cm_update_self ON public.conversation_members FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS msg_read ON public.messages;
+CREATE POLICY msg_read ON public.messages FOR SELECT TO authenticated USING (public.is_conversation_member(conversation_id, auth.uid()) AND (expires_at IS NULL OR expires_at > now()) AND deleted_at IS NULL);
+DROP POLICY IF EXISTS msg_send ON public.messages;
+CREATE POLICY msg_send ON public.messages FOR INSERT TO authenticated WITH CHECK (sender_id = auth.uid() AND public.is_conversation_member(conversation_id, auth.uid()));
+DROP POLICY IF EXISTS msg_update_member_read ON public.messages;
+CREATE POLICY msg_update_member_read ON public.messages FOR UPDATE TO authenticated USING (public.is_conversation_member(conversation_id, auth.uid())) WITH CHECK (public.is_conversation_member(conversation_id, auth.uid()));
+
+CREATE OR REPLACE FUNCTION public.set_message_expiry()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE v_ttl int;
+BEGIN
+  SELECT ephemeral_ttl INTO v_ttl FROM public.conversations WHERE id = NEW.conversation_id;
+  IF v_ttl > 0 AND NEW.expires_at IS NULL THEN
+    NEW.expires_at := now() + (v_ttl || ' seconds')::interval;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_message_expiry ON public.messages;
+CREATE TRIGGER trg_message_expiry BEFORE INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION public.set_message_expiry();
+
+CREATE OR REPLACE FUNCTION public.cleanup_ephemeral_messages()
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  DELETE FROM public.messages WHERE expires_at IS NOT NULL AND expires_at < now();
+$$;
+
+-- WebRTC : appels + signalisation temps réel
+CREATE TABLE IF NOT EXISTS public.call_signals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  call_id uuid NOT NULL REFERENCES public.calls(id) ON DELETE CASCADE,
+  sender_id uuid NOT NULL,
+  recipient_id uuid NOT NULL,
+  signal_type text NOT NULL,
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT, INSERT, DELETE ON public.call_signals TO authenticated;
+GRANT ALL ON public.call_signals TO service_role;
+ALTER TABLE public.calls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.call_signals ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS calls_participant ON public.calls;
+CREATE POLICY calls_participant ON public.calls FOR SELECT TO authenticated USING (caller_id = auth.uid() OR callee_id = auth.uid());
+DROP POLICY IF EXISTS calls_create ON public.calls;
+CREATE POLICY calls_create ON public.calls FOR INSERT TO authenticated WITH CHECK (caller_id = auth.uid());
+DROP POLICY IF EXISTS calls_update ON public.calls;
+CREATE POLICY calls_update ON public.calls FOR UPDATE TO authenticated USING (caller_id = auth.uid() OR callee_id = auth.uid()) WITH CHECK (caller_id = auth.uid() OR callee_id = auth.uid());
+
+DROP POLICY IF EXISTS call_signals_read ON public.call_signals;
+CREATE POLICY call_signals_read ON public.call_signals FOR SELECT TO authenticated USING (auth.uid() = sender_id OR auth.uid() = recipient_id);
+DROP POLICY IF EXISTS call_signals_insert ON public.call_signals;
+CREATE POLICY call_signals_insert ON public.call_signals FOR INSERT TO authenticated WITH CHECK (auth.uid() = sender_id);
+
+DO $$
+BEGIN
+  BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles; EXCEPTION WHEN duplicate_object THEN NULL; END;
+  BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.user_devices; EXCEPTION WHEN duplicate_object THEN NULL; END;
+  BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.conversations; EXCEPTION WHEN duplicate_object THEN NULL; END;
+  BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.conversation_members; EXCEPTION WHEN duplicate_object THEN NULL; END;
+  BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.messages; EXCEPTION WHEN duplicate_object THEN NULL; END;
+  BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.calls; EXCEPTION WHEN duplicate_object THEN NULL; END;
+  BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.call_signals; EXCEPTION WHEN duplicate_object THEN NULL; END;
+END $$;
+```
+
+---
+
 ## 2. Après exécution
 
 1. Regénère les types TS Supabase (automatique via Lovable dès qu'une migration Lovable est appliquée, ou manuel via CLI Supabase).

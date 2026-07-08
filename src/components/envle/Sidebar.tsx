@@ -8,11 +8,8 @@ interface SidebarProps {
   activeNav: string;
   onNavChange: (nav: string) => void;
   onOpenAuth: () => void;
-  onOpenCall: () => void;
-  onOpenNotifications: () => void;
   isOpen?: boolean;
   onClose?: () => void;
-  unreadNotifications?: number;
   userInitials?: string;
   userAvatarUrl?: string;
 }
@@ -26,7 +23,7 @@ const navItems = [
   { id: "map", icon: "🗺️", label: "Carte & Localisation" },
 ];
 
-const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall, onOpenNotifications, isOpen, onClose, unreadNotifications = 0, userInitials = "?", userAvatarUrl = "" }: SidebarProps) => {
+const Sidebar = ({ activeNav, onNavChange, onOpenAuth, isOpen, onClose, userInitials = "?", userAvatarUrl = "" }: SidebarProps) => {
   const { theme, toggleTheme } = useTheme();
   const { user, signOut } = useAuth();
 
