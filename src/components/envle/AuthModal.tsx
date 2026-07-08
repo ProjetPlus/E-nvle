@@ -121,8 +121,7 @@ const AuthModal = ({ open, onClose, locked = false }: Props) => {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3" onClick={(e) => e.target === e.currentTarget && !locked && onClose()}>
           <motion.div initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.92, y: 20 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} className="bg-envle-card border border-envle-border rounded-3xl p-6 md:p-8 w-[480px] max-w-[95vw]">
             <div className="flex flex-col items-center mb-5">
-              <motion.img src={envleLogo} alt="E'nvlé" className="w-28 h-28 object-contain mb-3" initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.1, type: "spring" }} />
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="text-envle-text-muted text-sm mt-1 text-center">Connexion par numéro de téléphone</motion.p>
+              <motion.img src={envleLogo} alt="E'nvlé" className="w-48 h-48 md:w-56 md:h-56 object-contain drop-shadow-2xl" initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.1, type: "spring" }} />
             </div>
 
             {pairingOpen && (
