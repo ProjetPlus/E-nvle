@@ -126,10 +126,9 @@ const ContactDiscoveryModal = ({ open, onClose, onSelectConversation }: Props) =
       }).select().single();
       if (convError || !conv) { setLoading(false); toast.error(convError?.message || "Conversation impossible"); return; }
       conversationId = conv.id;
-      const { error: memberError } = await supabase.from("conversation_members").insert([
-        { conversation_id: conversationId, user_id: user.id, role: "admin" },
-        { conversation_id: conversationId, user_id: contact.id, role: "member" },
-      ] as any);
+      const { error: ownerMemberError } = await supabase.from("conversation_members").insert({ conversation_id: conversationId, user_id: user.id, role: "admin" } as any);
+      if (ownerMemberError) { setLoading(false); toast.error(ownerMemberError.message); return; }
+      const { error: memberError } = await supabase.from("conversation_members").insert({ conversation_id: conversationId, user_id: contact.id, role: "member" } as any);
       if (memberError) { setLoading(false); toast.error(memberError.message); return; }
     }
 

@@ -35,7 +35,7 @@ const pageTransition = {
 
 const emptyConv: Conversation = {
   id: "",
-  name: "Sélectionnez une conversation",
+  name: "",
   lastMsg: "",
   time: "",
   avatar: "💬",
@@ -56,10 +56,18 @@ const defaultProfile: UserProfile = {
   profession: "",
 };
 
-const Index = () => {
+interface IndexProps {
+  initialNav?: string;
+  forceProfile?: boolean;
+  authOnly?: boolean;
+}
+
+const isSyntheticPhoneEmail = (email?: string | null) => Boolean(email?.endsWith("@auth.envle.local"));
+
+const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: IndexProps) => {
   const [showSplash, setShowSplash] = useState(true);
   const [appVisible, setAppVisible] = useState(false);
-  const [activeNav, setActiveNav] = useState("chat");
+  const [activeNav, setActiveNav] = useState(initialNav);
   const [activeConv, setActiveConv] = useState<Conversation>(emptyConv);
   const [authOpen, setAuthOpen] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
@@ -85,7 +93,7 @@ const Index = () => {
     setUserProfile({
       name: profile.full_name || "",
       phone: profile.phone || "",
-      email: profile.email || user?.email || "",
+      email: profile.email && !isSyntheticPhoneEmail(profile.email) ? profile.email : "",
       bio: profile.bio || "",
       avatar: (profile.full_name || user?.email || "?").charAt(0).toUpperCase(),
       avatarUrl: profile.avatar_url || "",
@@ -94,7 +102,7 @@ const Index = () => {
       location: profile.location || "",
       profession: profile.profession || "",
     });
-    if (!profile.profile_completed) setActiveNav("settings");
+    if (!profile.profile_completed || forceProfile) setActiveNav("settings");
   }, [profile, user?.email]);
 
   useEffect(() => {
@@ -187,14 +195,14 @@ const Index = () => {
           {activeNav === "jobs" && <JobsModule onBack={goChat} onCreateJob={() => setCreateModal({ open: true, type: "job" })} onCreateBusiness={() => setCreateModal({ open: true, type: "business" })} />}
           {activeNav === "map" && <MapModule onBack={goChat} />}
           {activeNav === "wallet" && <WalletModule onBack={goChat} />}
-          {activeNav === "settings" && <SettingsModule onBack={goChat} userProfile={userProfile} onUpdateProfile={setUserProfile} requireProfile={mustCompleteProfile} onProfileSaved={() => setActiveNav("chat")} />}
+          {activeNav === "settings" && <SettingsModule onBack={goChat} userProfile={userProfile} onUpdateProfile={setUserProfile} requireProfile={mustCompleteProfile || forceProfile} onProfileSaved={() => setActiveNav("chat")} />}
           {activeNav === "chat" && (
             <>
               <div className={`${isMobile && mobileView === "chat" ? "hidden" : "flex"} ${isMobile ? "flex-1" : ""}`}>
                 <ConversationPanel activeConvId={activeConv.id} onSelectConv={handleSelectConv} />
               </div>
               <div className={`flex-1 flex ${isMobile && mobileView === "list" ? "hidden" : ""}`}>
-                <ChatArea conv={activeConv} onOpenCall={openCall} onBack={isMobile ? () => setMobileView("list") : undefined} />
+                <ChatArea conv={activeConv} onOpenCall={openCall} onOpenStories={() => setActiveNav("stories")} onOpenNotifications={() => setNotificationsOpen(true)} onBack={isMobile ? () => setMobileView("list") : undefined} />
               </div>
               {!isMobile && <RightPanel conv={activeConv} onOpenCall={openCall} />}
             </>
@@ -206,10 +214,10 @@ const Index = () => {
 
   return (
     <div className="h-screen overflow-hidden">
-      {showSplash && <SplashScreen onFinish={handleSplashFinish} />}
+      {!authOnly && showSplash && <SplashScreen onFinish={handleSplashFinish} />}
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: appVisible ? 1 : 0 }} transition={{ duration: 0.5 }} className="flex h-screen">
-        {user && <Sidebar
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: authOnly || appVisible ? 1 : 0 }} transition={{ duration: 0.5 }} className="flex h-screen">
+        {user && !forceProfile && <Sidebar
           activeNav={activeNav}
           onNavChange={handleNavChange}
           onOpenAuth={() => setAuthOpen(true)}
@@ -222,7 +230,7 @@ const Index = () => {
           userAvatarUrl={profile?.avatar_url || ""}
         />}
 
-        {user && isMobile && appVisible && (
+        {user && !forceProfile && isMobile && appVisible && (
           <motion.button
             whileTap={{ scale: 0.85 }}
             whileHover={{ scale: 1.05 }}
@@ -236,7 +244,7 @@ const Index = () => {
         {renderMainContent()}
       </motion.div>
 
-      <AuthModal open={!authLoading && authOpen && !user} locked onClose={() => setAuthOpen(false)} />
+      <AuthModal open={!authLoading && (authOpen || authOnly) && !user} locked onClose={() => setAuthOpen(false)} />
       <CallModal open={callOpen} type={callType} convName={callPeer?.name || activeConv.name} convAvatar={callPeer?.avatar || activeConv.avatar} convAvatarStyle={callPeer?.avatarStyle || activeConv.avatarStyle} callId={currentCallId} direction={callDirection} remoteUserId={callDirection === "incoming" ? callPeer?.contactId : activeConv.contactId} onClose={() => setCallOpen(false)} />
       <NotificationCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} notifications={notifications} onMarkAllRead={markAllRead} onClearAll={clearNotifications} />
       <CreateBusinessModal open={createModal.open} type={createModal.type} onClose={() => setCreateModal({ ...createModal, open: false })} />

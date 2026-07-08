@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import envleLogo from "@/assets/envle-logo.png";
 import { isValidPhone, normalizePhone, phoneToDisplayName } from "@/lib/phone";
+import QRCodeDisplay from "./QRCodeDisplay";
 
 interface Props {
   open: boolean;
@@ -37,6 +38,7 @@ const AuthModal = ({ open, onClose, locked = false }: Props) => {
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [pairingOpen, setPairingOpen] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const fullPhone = normalizePhone(phone.startsWith("+") ? phone : `${countryCode}${phone}`);
 
@@ -119,10 +121,16 @@ const AuthModal = ({ open, onClose, locked = false }: Props) => {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3" onClick={(e) => e.target === e.currentTarget && !locked && onClose()}>
           <motion.div initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.92, y: 20 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} className="bg-envle-card border border-envle-border rounded-3xl p-6 md:p-8 w-[480px] max-w-[95vw]">
             <div className="flex flex-col items-center mb-5">
-              <motion.img src={envleLogo} alt="E'nvlé" className="w-16 h-16 object-contain mb-3" initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.1, type: "spring" }} />
-              <motion.h2 initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="font-display text-2xl font-bold">E'nvlé One</motion.h2>
+              <motion.img src={envleLogo} alt="E'nvlé" className="w-28 h-28 object-contain mb-3" initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.1, type: "spring" }} />
               <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="text-envle-text-muted text-sm mt-1 text-center">Connexion par numéro de téléphone</motion.p>
             </div>
+
+            {pairingOpen && (
+              <div className="mb-4 rounded-2xl border border-envle-border bg-foreground/[0.04] p-4 text-center">
+                <QRCodeDisplay value={`envle-pair://${crypto.randomUUID()}`} size={160} />
+                <p className="mt-3 text-xs text-envle-text-muted">Scannez ce code depuis un appareil déjà connecté.</p>
+              </div>
+            )}
 
             <AnimatePresence mode="wait">
               {step === "phone" ? (
@@ -142,6 +150,7 @@ const AuthModal = ({ open, onClose, locked = false }: Props) => {
                     <input placeholder="Votre nom (optionnel)" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full px-4 py-3 bg-foreground/[0.06] border border-envle-border rounded-xl text-foreground font-body text-sm outline-none focus:border-primary placeholder:text-envle-text-muted" />
                   </div>
                   <motion.button whileTap={{ scale: 0.97 }} whileHover={{ y: -2 }} disabled={loading} className="w-full py-3.5 rounded-[14px] border-none text-primary-foreground font-body text-[15px] font-bold cursor-pointer mt-2 transition-all shadow-[0_4px_20px_hsla(142,47%,33%,0.4)] disabled:opacity-50 bg-primary" onClick={requestOTP}>{loading ? "⏳ Envoi..." : "📱 Recevoir le code"}</motion.button>
+                  <button className="w-full py-2.5 rounded-xl border border-envle-border bg-transparent text-xs text-envle-text-muted cursor-pointer font-body" onClick={() => setPairingOpen((v) => !v)}>📱 Connecter second appareil par QR</button>
                 </motion.div>
               ) : (
                 <motion.div key="otp" initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -15 }}>
