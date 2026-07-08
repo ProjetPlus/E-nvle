@@ -28,6 +28,24 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const DEVICE_ID_KEY = "envle-current-device-id";
+
+const getDeviceId = () => {
+  let id = window.localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    window.localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+};
+
+const getDeviceLabel = () => {
+  const ua = navigator.userAgent;
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+  const browser = /Edg/i.test(ua) ? "Edge" : /Chrome/i.test(ua) ? "Chrome" : /Safari/i.test(ua) ? "Safari" : /Firefox/i.test(ua) ? "Firefox" : "Navigateur";
+  return `${browser} · ${isMobile ? "Mobile" : "Desktop"}`;
+};
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -36,41 +54,74 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const loadProfile = useCallback(async (uid?: string) => {
     if (!uid) { setProfile(null); return; }
-    const { data } = await supabase.from("profiles").select("*").eq("id", uid).maybeSingle();
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", uid).maybeSingle();
+    if (error) {
+      setProfile(null);
+      return;
+    }
     setProfile((data as EnvleProfile | null) ?? null);
     if (data) {
-      await supabase.from("profiles").update({ status: "online", last_seen: new Date().toISOString() }).eq("id", uid);
+      void supabase.from("profiles").update({ status: "online", last_seen: new Date().toISOString() }).eq("id", uid);
     }
   }, []);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      const { data: verified } = session ? await supabase.auth.getUser() : { data: { user: null } };
-      const activeUser = verified.user ?? null;
-      setUser(activeUser);
-      await loadProfile(activeUser?.id);
-      setLoading(false);
-    });
+  const registerCurrentDevice = useCallback((uid?: string) => {
+    if (!uid) return;
+    const now = new Date().toISOString();
+    const deviceId = getDeviceId();
+    void supabase.from("user_devices").update({ is_current: false }).eq("user_id", uid);
+    void supabase.from("user_devices").upsert({
+      id: deviceId,
+      user_id: uid,
+      device_name: getDeviceLabel(),
+      device_type: /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? "mobile" : "desktop",
+      is_current: true,
+      last_active: now,
+    }, { onConflict: "id" });
+  }, []);
 
-    // Listen for changes
+  useEffect(() => {
+    let mounted = true;
+
+    const hydrate = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data: verified } = session ? await supabase.auth.getUser() : { data: { user: null } };
+      if (!mounted) return;
+      const activeUser = verified.user ?? null;
+      setSession(session);
+      setUser(activeUser);
+      registerCurrentDevice(activeUser?.id);
+      await loadProfile(activeUser?.id);
+      if (mounted) setLoading(false);
+    };
+
+    void hydrate();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         setSession(session);
         const activeUser = session?.user ?? null;
         setUser(activeUser);
-        await loadProfile(activeUser?.id);
+        registerCurrentDevice(activeUser?.id);
+        setTimeout(() => void loadProfile(activeUser?.id), 0);
         setLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
-  }, [loadProfile]);
+    return () => { mounted = false; subscription.unsubscribe(); };
+  }, [loadProfile, registerCurrentDevice]);
 
   useEffect(() => {
     if (!user?.id) return;
-    const setOnline = () => supabase.from("profiles").update({ status: document.hidden ? "away" : "online", last_seen: new Date().toISOString() }).eq("id", user.id).then(() => {});
-    const setOffline = () => supabase.from("profiles").update({ status: "offline", last_seen: new Date().toISOString() }).eq("id", user.id).then(() => {});
+    const setOnline = () => {
+      const now = new Date().toISOString();
+      void supabase.from("profiles").update({ status: document.hidden ? "away" : "online", last_seen: now }).eq("id", user.id);
+      void supabase.from("user_devices").update({ last_active: now, is_current: true }).eq("id", getDeviceId()).eq("user_id", user.id);
+    };
+    const setOffline = () => {
+      void supabase.from("profiles").update({ status: "offline", last_seen: new Date().toISOString() }).eq("id", user.id);
+      void supabase.from("user_devices").update({ is_current: false, last_active: new Date().toISOString() }).eq("id", getDeviceId()).eq("user_id", user.id);
+    };
     void setOnline();
     const heartbeat = window.setInterval(setOnline, 45_000);
     document.addEventListener("visibilitychange", setOnline);
@@ -85,6 +136,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = useCallback(async () => {
     if (user?.id) await supabase.from("profiles").update({ status: "offline", last_seen: new Date().toISOString() }).eq("id", user.id);
+    if (user?.id) await supabase.from("user_devices").update({ is_current: false, last_active: new Date().toISOString() }).eq("id", getDeviceId()).eq("user_id", user.id);
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);

@@ -18,6 +18,7 @@ export interface Conversation {
   status?: string;
   contactId?: string;
   phone?: string;
+  ephemeralTtl?: number | null;
 }
 
 const tabs = ["Tous", "Non lus", "Groupes", "Chaînes"];
@@ -94,6 +95,7 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
             status: otherProfile?.status === "online" ? "Connecté" : lastSeen ? `Vu ${lastSeen}` : "",
             contactId: otherProfile?.id,
             phone: otherProfile?.phone,
+            ephemeralTtl: c.ephemeral_ttl,
           };
         })
       );
@@ -139,7 +141,7 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
     onSelectConv({
       id: conv.id, name, lastMsg: "", time: "", avatar: name[0]?.toUpperCase() || "💬",
       avatarStyle: conv.avatar_style || "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))",
-      isSquare: false, status: "",
+      isSquare: false, status: "", ephemeralTtl: conv.ephemeral_ttl,
     });
   };
 

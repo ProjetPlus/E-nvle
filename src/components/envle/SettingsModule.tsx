@@ -31,12 +31,7 @@ export const setAppLanguage = (code: string) => {
   localStorage.setItem("envle-language", code);
 };
 
-const connectedDevices = [
-  { id: "1", name: "iPhone 15 Pro", type: "📱", lastActive: "Actif maintenant", isCurrent: true },
-  { id: "2", name: "MacBook Pro 14\"", type: "💻", lastActive: "Actif maintenant", isCurrent: false },
-  { id: "3", name: "iPad Air", type: "📱", lastActive: "Il y a 2h", isCurrent: false },
-  { id: "4", name: "Chrome · Windows", type: "🖥️", lastActive: "Il y a 1 jour", isCurrent: false },
-];
+type ConnectedDevice = { id: string; name: string; type: string; lastActive: string; isCurrent: boolean };
 
 interface Props {
   onBack: () => void;
@@ -69,6 +64,8 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
   const [profile, setProfile] = useState(userProfile);
   const [selectedLang, setSelectedLang] = useState(getAppLanguage());
   const [showQR, setShowQR] = useState(false);
+  const [showPairingQR, setShowPairingQR] = useState(false);
+  const [connectedDevices, setConnectedDevices] = useState<ConnectedDevice[]>([]);
   const [autoTranslate, setAutoTranslate] = useState(localStorage.getItem("envle-auto-translate") !== "false");
   const draftKey = user ? `envle-profile-draft-${user.id}` : "envle-profile-draft";
 
@@ -81,6 +78,23 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
     if (!user) return;
     localStorage.setItem(draftKey, JSON.stringify(profile));
   }, [draftKey, profile, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const loadDevices = async () => {
+      const { data } = await supabase.from("user_devices").select("id, device_name, device_type, is_current, last_active").eq("user_id", user.id).order("last_active", { ascending: false });
+      setConnectedDevices((data || []).map((device) => ({
+        id: device.id,
+        name: device.device_name,
+        type: device.device_type === "mobile" ? "📱" : "💻",
+        isCurrent: !!device.is_current,
+        lastActive: device.is_current ? "Actif maintenant" : device.last_active ? new Date(device.last_active).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "Inconnu",
+      })));
+    };
+    void loadDevices();
+    const channel = supabase.channel(`devices-${user.id}`).on("postgres_changes", { event: "*", schema: "public", table: "user_devices", filter: `user_id=eq.${user.id}` }, () => void loadDevices()).subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
 
   const uploadProfileMedia = async (file: File, kind: "avatar" | "cover") => {
     if (!user) { toast.error("Connectez-vous d'abord"); return; }
@@ -132,14 +146,14 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
   const sections = [
     { id: "profile", icon: "👤", label: "Mon profil", desc: "Nom, photo, bio, profession" },
     { id: "language", icon: "🌍", label: "Langue & Traduction", desc: `${languages.find((l) => l.code === selectedLang)?.label} · Trad. auto ${autoTranslate ? "ON" : "OFF"}` },
-    { id: "devices", icon: "📱", label: "Appareils connectés", desc: `${connectedDevices.length}/10 appareils` },
+    { id: "devices", icon: "📱", label: "Appareils connectés", desc: `${connectedDevices.length}/1 actif · QR pour ajouter` },
     { id: "theme", icon: theme === "dark" ? "🌙" : "☀️", label: "Apparence", desc: theme === "dark" ? "Mode sombre" : "Mode clair" },
     { id: "privacy", icon: "🔒", label: "Confidentialité", desc: "Dernière connexion, photo de profil" },
     { id: "notifications", icon: "🔔", label: "Notifications", desc: "Sons, badges, alertes" },
-    { id: "storage", icon: "💾", label: "Stockage & Données", desc: "1.2 Go utilisés" },
+    { id: "storage", icon: "💾", label: "Stockage & Données", desc: "Synchronisé Supabase" },
     { id: "qr", icon: "📱", label: "Mon QR Code", desc: "Scanner ou partager" },
     { id: "help", icon: "❓", label: "Aide & Support", desc: "FAQ, contacter le support" },
-    { id: "about", icon: "ℹ️", label: "À propos", desc: "E'nvlé v2.5 · Super App Africaine" },
+    { id: "about", icon: "ℹ️", label: "À propos", desc: "Version production" },
   ];
 
   return (
@@ -214,9 +228,9 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
             </div>
             <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 scrollbar-thin">
               {requireProfile && <div className="rounded-2xl border border-envle-or/30 bg-envle-or/10 p-3 text-sm text-envle-or">Complétez votre profil pour accéder à E'nvlé One.</div>}
-              <label className="relative h-32 rounded-2xl border border-envle-border overflow-hidden cursor-pointer bg-foreground/[0.06] flex items-center justify-center group">
-                {profile.coverUrl ? <img src={profile.coverUrl} alt="Couverture" className="absolute inset-0 w-full h-full object-cover" /> : <span className="text-xs text-envle-text-muted">Photo de couverture obligatoire</span>}
-                <span className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-background/80 border border-envle-border text-xs font-semibold">📷 Importer</span>
+              <label className="relative min-h-40 rounded-2xl border border-envle-border overflow-hidden cursor-pointer bg-foreground/[0.06] flex items-center justify-center group">
+                {profile.coverUrl ? <img src={profile.coverUrl} alt="Photo de couverture" className="absolute inset-0 w-full h-full object-cover" /> : <span className="text-xs text-envle-text-muted">Photo de couverture obligatoire</span>}
+                <span className="absolute inset-x-4 bottom-3 px-3 py-2 rounded-xl bg-background/90 border border-envle-border text-xs font-semibold text-center">📷 Importer une photo de couverture obligatoire</span>
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadProfileMedia(e.target.files[0], "cover")} />
               </label>
               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-3 mb-4">
@@ -304,9 +318,9 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
             <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-primary/10 border border-primary/20 rounded-2xl p-4 mb-6">
                 <div className="text-sm font-semibold text-envle-vert-light mb-1">📱 Multi-appareils E'nvlé</div>
-                <p className="text-xs text-envle-text-muted">Connectez jusqu'à <strong>10 appareils</strong> en même temps.</p>
+                <p className="text-xs text-envle-text-muted">Un seul appareil est actif par défaut. Pour autoriser un second appareil, générez un QR et scannez-le avec l'appareil déjà connecté.</p>
               </motion.div>
-              <h4 className="text-xs font-bold text-envle-text-muted uppercase tracking-wider mb-3">Appareils ({connectedDevices.length}/10)</h4>
+              <h4 className="text-xs font-bold text-envle-text-muted uppercase tracking-wider mb-3">Appareils ({connectedDevices.length}/1 actif)</h4>
               {connectedDevices.map((device, i) => (
                 <motion.div key={device.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }} whileHover={{ x: 3 }} className="flex items-center gap-3 py-3 border-b border-envle-border/50">
                   <motion.span whileHover={{ scale: 1.15 }} className="text-2xl">{device.type}</motion.span>
@@ -314,10 +328,11 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
                     <div className="text-sm font-semibold flex items-center gap-2">{device.name} {device.isCurrent && <span className="text-[10px] bg-primary/20 text-envle-vert-light px-2 py-0.5 rounded-full">Cet appareil</span>}</div>
                     <div className="text-xs text-envle-text-muted">{device.lastActive}</div>
                   </div>
-                  {!device.isCurrent && <motion.button whileTap={{ scale: 0.9 }} className="text-xs text-envle-rouge border-none bg-transparent cursor-pointer font-body" onClick={() => toast(`❌ ${device.name} déconnecté`)}>Déconnecter</motion.button>}
+                  {!device.isCurrent && <motion.button whileTap={{ scale: 0.9 }} className="text-xs text-envle-rouge border-none bg-transparent cursor-pointer font-body" onClick={async () => { await supabase.from("user_devices").delete().eq("id", device.id).eq("user_id", user?.id || ""); toast(`❌ ${device.name} déconnecté`); }}>Déconnecter</motion.button>}
                 </motion.div>
               ))}
-              <motion.button whileTap={{ scale: 0.95 }} whileHover={{ y: -1 }} className="w-full mt-4 py-3 rounded-xl border border-dashed border-envle-border bg-transparent text-sm text-envle-text-muted cursor-pointer font-body hover:border-primary/40 transition-all" onClick={() => toast("📱 Scannez le QR code sur le nouvel appareil")}>+ Connecter un nouvel appareil</motion.button>
+              {showPairingQR && <div className="mt-4 rounded-2xl border border-envle-border bg-foreground/[0.04] p-4 text-center"><QRCodeDisplay value={`envle-device://${user?.id}/${crypto.randomUUID()}`} size={180} /><p className="mt-3 text-xs text-envle-text-muted">Scannez depuis le nouvel appareil pour autoriser la connexion.</p></div>}
+              <motion.button whileTap={{ scale: 0.95 }} whileHover={{ y: -1 }} className="w-full mt-4 py-3 rounded-xl border border-dashed border-envle-border bg-transparent text-sm text-envle-text-muted cursor-pointer font-body hover:border-primary/40 transition-all" onClick={() => setShowPairingQR((v) => !v)}>+ Connecter un autre appareil par QR</motion.button>
             </div>
           </motion.div>
         )}

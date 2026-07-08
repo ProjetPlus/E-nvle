@@ -8,19 +8,14 @@ interface SidebarProps {
   activeNav: string;
   onNavChange: (nav: string) => void;
   onOpenAuth: () => void;
-  onOpenCall: () => void;
-  onOpenNotifications: () => void;
   isOpen?: boolean;
   onClose?: () => void;
-  unreadNotifications?: number;
   userInitials?: string;
   userAvatarUrl?: string;
 }
 
 const navItems = [
   { id: "chat", icon: "💬", label: "Messages" },
-  { id: "calls", icon: "📞", label: "Appels" },
-  { id: "stories", icon: "✨", label: "Stories & Reels" },
   { id: "community", icon: "👥", label: "Communautés" },
   { id: "shop", icon: "🛍️", label: "Boutique & Commerce" },
   { id: "wallet", icon: "💰", label: "Portefeuille" },
@@ -28,7 +23,7 @@ const navItems = [
   { id: "map", icon: "🗺️", label: "Carte & Localisation" },
 ];
 
-const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall, onOpenNotifications, isOpen, onClose, unreadNotifications = 0, userInitials = "?", userAvatarUrl = "" }: SidebarProps) => {
+const Sidebar = ({ activeNav, onNavChange, onOpenAuth, isOpen, onClose, userInitials = "?", userAvatarUrl = "" }: SidebarProps) => {
   const { theme, toggleTheme } = useTheme();
   const { user, signOut } = useAuth();
 
@@ -67,23 +62,7 @@ const Sidebar = ({ activeNav, onNavChange, onOpenAuth, onOpenCall, onOpenNotific
         </motion.button>
       ))}
 
-      <motion.button whileHover={{ scale: 1.1, y: -2 }} whileTap={{ scale: 0.88 }} className="w-11 h-11 rounded-[14px] border-none text-[20px] cursor-pointer transition-colors flex items-center justify-center bg-transparent text-envle-text-muted hover:bg-envle-card hover:text-foreground" onClick={onOpenCall} title="Réunions (50 pers.)">📹</motion.button>
-
       <div className="flex-1" />
-
-      <motion.button whileHover={{ scale: 1.1, y: -2 }} whileTap={{ scale: 0.88 }} className="w-11 h-11 rounded-[14px] border-none text-[20px] cursor-pointer transition-colors flex items-center justify-center bg-transparent text-envle-text-muted hover:bg-envle-card hover:text-foreground relative" onClick={onOpenNotifications} title="Notifications">
-        🔔
-        {unreadNotifications > 0 && (
-          <motion.span
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 500, damping: 15 }}
-            className="absolute top-1 right-1 w-[18px] h-[18px] rounded-full bg-envle-rouge text-[10px] font-bold flex items-center justify-center text-foreground"
-          >
-            {unreadNotifications}
-          </motion.span>
-        )}
-      </motion.button>
 
       <motion.button
         whileHover={{ scale: 1.1, rotate: 180 }}

@@ -28,6 +28,8 @@ interface Message {
 interface Props {
   conv: Conversation;
   onOpenCall: (type: string) => void;
+  onOpenStories: () => void;
+  onOpenNotifications: () => void;
   onBack?: () => void;
 }
 
@@ -39,7 +41,7 @@ const msgVariants = {
 
 const EMOJI_LIST = ["😀","😂","🥰","😍","🤩","😎","🤔","😅","😢","😡","🥳","🤗","😇","🙏","👍","👎","❤️","🔥","💯","✨","🎉","🎊","💪","👏","🙌","💀","😤","🥺","😭","😈","👀","💬","📸","🎵","⚡","🌍","🇨🇮","🇸🇳","🇲🇱","🇧🇫","🇬🇳","🇳🇬","🇬🇭","🇹🇬","🇧🇯","🇳🇪"];
 
-const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
+const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack }: Props) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [attachOpen, setAttachOpen] = useState(false);
@@ -54,6 +56,8 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
   const [aiModel, setAiModel] = useState<"gemini" | "gpt" | "pro">("gemini");
   const [autoReply, setAutoReply] = useState(localStorage.getItem("envle-ai-auto-reply") === "true");
   const [aiBusy, setAiBusy] = useState(false);
+  const [ephemeralTtl, setEphemeralTtl] = useState<number>(conv.ephemeralTtl || 0);
+  const [ephemeralOpen, setEphemeralOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const areaRef = useRef<HTMLDivElement>(null);
@@ -64,6 +68,10 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
   const { user } = useAuth();
 
   useEffect(() => {
+    setEphemeralTtl(conv.ephemeralTtl || 0);
+  }, [conv.id, conv.ephemeralTtl]);
+
+  useEffect(() => {
     if (areaRef.current) areaRef.current.scrollTop = areaRef.current.scrollHeight;
   }, [messages]);
 
@@ -71,7 +79,8 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
   useEffect(() => {
     if (!conv.id || !user) { setMessages([]); return; }
     const fetchMessages = async () => {
-      const { data } = await supabase.from("messages").select("*").eq("conversation_id", conv.id).order("created_at", { ascending: true }).limit(100);
+      await supabase.rpc("cleanup_ephemeral_messages");
+      const { data } = await supabase.from("messages").select("*").eq("conversation_id", conv.id).is("deleted_at", null).or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).order("created_at", { ascending: true }).limit(100);
       if (data) {
         setMessages(data.map((m) => ({
           id: m.id, text: m.content || "", sent: m.sender_id === user.id,
@@ -119,7 +128,8 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
   const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (!text && pendingFiles.length === 0) return;
-    if (!user || !conv.id) { toast.error("Connectez-vous pour envoyer des messages"); return; }
+    if (!user) { toast.error("Session en cours de restauration. Réessayez dans un instant."); return; }
+    if (!conv.id) { toast.error("Sélectionnez ou créez une conversation avant d'envoyer."); return; }
     setSending(true);
     setInput("");
     const filesToSend = [...pendingFiles];
@@ -129,20 +139,33 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
         for (const fileData of filesToSend) {
           const uploaded = await uploadFileToStorage(fileData.file);
           if (uploaded) {
-            await supabase.from("messages").insert({
+            const expiresAt = ephemeralTtl > 0 ? new Date(Date.now() + ephemeralTtl * 1000).toISOString() : null;
+            const { error } = await supabase.from("messages").insert({
               conversation_id: conv.id, sender_id: user.id, content: fileData.name,
               message_type: fileData.type.startsWith("image/") ? "image" : "file",
-              file_url: uploaded.url, file_name: uploaded.name, file_size: uploaded.size,
+              file_url: uploaded.url, file_name: uploaded.name, file_size: uploaded.size, expires_at: expiresAt,
             });
+            if (error) throw error;
           }
         }
       }
       if (text) {
-        await supabase.from("messages").insert({ conversation_id: conv.id, sender_id: user.id, content: text, message_type: "text" });
+        const expiresAt = ephemeralTtl > 0 ? new Date(Date.now() + ephemeralTtl * 1000).toISOString() : null;
+        const { error } = await supabase.from("messages").insert({ conversation_id: conv.id, sender_id: user.id, content: text, message_type: "text", expires_at: expiresAt });
+        if (error) throw error;
       }
       await supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conv.id);
-    } catch { toast.error("❌ Erreur d'envoi"); } finally { setSending(false); }
-  }, [input, pendingFiles, user, conv.id, uploadFileToStorage]);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "❌ Erreur d'envoi"); } finally { setSending(false); }
+  }, [input, pendingFiles, user, conv.id, ephemeralTtl, uploadFileToStorage]);
+
+  const updateEphemeral = async (ttl: number) => {
+    if (!conv.id) return;
+    setEphemeralTtl(ttl);
+    const { error } = await supabase.from("conversations").update({ ephemeral_ttl: ttl, updated_at: new Date().toISOString() }).eq("id", conv.id);
+    if (error) toast.error(error.message);
+    else toast.success(ttl > 0 ? "Messages éphémères activés" : "Messages éphémères désactivés");
+    setEphemeralOpen(false);
+  };
 
   const generateAiReply = useCallback(async (sourceText?: string, automatic = false) => {
     const text = sourceText || input.trim();
@@ -282,25 +305,55 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="px-3 md:px-6 py-3 bg-envle-card border-b border-envle-border flex items-center gap-2 md:gap-3 z-10">
         {onBack && <motion.button whileTap={{ scale: 0.85 }} className="w-9 h-9 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all" onClick={onBack}>←</motion.button>}
-        <motion.div whileHover={{ scale: 1.05 }} className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-base" style={{ background: conv.avatarStyle }}>{conv.avatar}</motion.div>
+        <motion.div whileHover={{ scale: 1.05 }} className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-base" style={{ background: conv.avatarStyle }}>{conv.avatar || "💬"}</motion.div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold truncate">{conv.name}</div>
-          <div className="text-[11px] text-envle-text-muted truncate">{conv.status || "Sélectionnez une discussion"}</div>
+          {conv.id ? (
+            <>
+              <div className="text-sm font-bold truncate">{conv.name}</div>
+              {conv.status && <div className="text-[11px] text-envle-text-muted truncate">{conv.status}</div>}
+            </>
+          ) : <div className="text-sm font-bold truncate text-envle-text-muted">Messages</div>}
         </div>
-        <div className="flex gap-1">
-          {["🤖", "📞", "📹", "🔍"].map((icon, i) => (
+        <div className="flex gap-1 relative">
+          {[
+            { icon: "✨", action: onOpenStories, title: "Stories" },
+            { icon: "📞", action: () => onOpenCall("audio"), title: "Appel audio" },
+            { icon: "📹", action: () => onOpenCall("video"), title: "Appel vidéo" },
+            { icon: "🔔", action: onOpenNotifications, title: "Notifications" },
+            { icon: "🤖", action: () => setAiOpen((v) => !v), title: "IA" },
+            { icon: "⏳", action: () => setEphemeralOpen((v) => !v), title: "Messages éphémères" },
+          ].map((item) => (
             <motion.button
-              key={i}
+              key={item.title}
               whileTap={{ scale: 0.85 }}
               whileHover={{ scale: 1.1 }}
-              className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-foreground/[0.06] border-none text-envle-text-muted text-base cursor-pointer transition-all flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light"
-              onClick={() => { if (icon === "🤖") setAiOpen((v) => !v); else if (icon === "📞") onOpenCall("audio"); else if (icon === "📹") onOpenCall("video"); }}
+              className={`w-8 h-8 md:w-9 md:h-9 rounded-xl border-none text-base cursor-pointer transition-all flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light ${item.title === "Messages éphémères" && ephemeralTtl > 0 ? "bg-primary/20 text-envle-vert-light" : "bg-foreground/[0.06] text-envle-text-muted"}`}
+              onClick={item.action}
+              title={item.title}
             >
-              {icon}
+              {item.icon}
             </motion.button>
           ))}
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {ephemeralOpen && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="z-10 bg-envle-card border-b border-envle-border px-3 md:px-6 py-2 overflow-hidden">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-envle-text-muted">Éphémère</span>
+              {[
+                { label: "OFF", ttl: 0 },
+                { label: "1h", ttl: 3600 },
+                { label: "24h", ttl: 86400 },
+                { label: "7j", ttl: 604800 },
+              ].map((option) => (
+                <button key={option.label} className={`px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer ${ephemeralTtl === option.ttl ? "bg-primary/20 border-primary/40 text-envle-vert-light" : "bg-transparent border-envle-border text-envle-text-muted"}`} onClick={() => updateEphemeral(option.ttl)}>{option.label}</button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {aiOpen && (
@@ -357,6 +410,7 @@ const ChatArea = ({ conv, onOpenCall, onBack }: Props) => {
                   </motion.button>
                 )}
                 <div className="text-[10px] opacity-60 mt-1 flex items-center justify-end gap-1">
+                  {ephemeralTtl > 0 && msg.sent && <span>⏳</span>}
                   {msg.time}
                   {msg.sent && <span className="text-xs text-envle-or">✓✓</span>}
                 </div>
