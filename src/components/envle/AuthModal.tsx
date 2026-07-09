@@ -66,12 +66,9 @@ const AuthModal = ({ open, onClose, locked = false }: Props) => {
     toast.success("📱 Code OTP simulé généré");
   };
 
-  const verifyOTP = async () => {
-    const code = otpCode.join("");
-    if (code.length !== 6) {
-      toast.error("Entrez le code à 6 chiffres");
-      return;
-    }
+  const verifyOTP = async (codeOverride?: string) => {
+    const code = codeOverride ?? otpCode.join("");
+    if (code.length !== 6) return;
     setLoading(true);
     const { data, error } = await supabase.functions.invoke("phone-auth", {
       body: { action: "verify", phone: fullPhone, code, fullName: fullName || phoneToDisplayName(fullPhone) },
@@ -91,6 +88,14 @@ const AuthModal = ({ open, onClose, locked = false }: Props) => {
     resetForm();
     onClose();
   };
+
+  // Auto-verify when 6 digits entered
+  useEffect(() => {
+    const code = otpCode.join("");
+    if (step === "otp" && code.length === 6 && !loading) void verifyOTP(code);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otpCode, step]);
+
 
   const resetForm = () => {
     setStep("phone");
