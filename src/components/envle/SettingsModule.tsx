@@ -229,17 +229,18 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
             <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 scrollbar-thin">
               {requireProfile && <div className="rounded-2xl border border-envle-or/30 bg-envle-or/10 p-3 text-sm text-envle-or">Complétez votre profil pour accéder à E'nvlé One.</div>}
               <label className="relative min-h-40 rounded-2xl border border-envle-border overflow-hidden cursor-pointer bg-foreground/[0.06] flex items-center justify-center group">
-                {profile.coverUrl ? <img src={profile.coverUrl} alt="Photo de couverture" className="absolute inset-0 w-full h-full object-cover" /> : <span className="text-xs text-envle-text-muted">Photo de couverture obligatoire</span>}
-                <span className="absolute inset-x-4 bottom-3 px-3 py-2 rounded-xl bg-background/90 border border-envle-border text-xs font-semibold text-center">📷 Importer une photo de couverture obligatoire</span>
+                {profile.coverUrl ? <img src={profile.coverUrl} alt="Photo de couverture" className="absolute inset-0 w-full h-full object-cover" /> : <span className="text-xs text-envle-text-muted">Photo de couverture</span>}
+                <span className="absolute right-3 bottom-3 px-3 py-1.5 rounded-lg bg-background/90 border border-envle-border text-[11px] font-semibold">📷 Couverture</span>
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadProfileMedia(e.target.files[0], "cover")} />
               </label>
-              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-3 mb-4">
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-2 mb-4">
                 <label className="w-24 h-24 rounded-full flex items-center justify-center text-4xl font-bold border-4 border-primary overflow-hidden cursor-pointer" style={{ background: profile.avatarStyle }}>
                   {profile.avatarUrl ? <img src={profile.avatarUrl} alt="Photo profil" className="w-full h-full object-cover" /> : profile.avatar}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadProfileMedia(e.target.files[0], "avatar")} />
                 </label>
-                <span className="text-xs text-primary font-semibold">📷 Importer une photo de profil obligatoire</span>
+                <span className="text-[11px] text-primary font-semibold">📷 Photo de profil</span>
               </motion.div>
+
               {[
                 { key: "name", label: "Nom complet", placeholder: "Votre nom" },
                 { key: "phone", label: "Téléphone", placeholder: "+225 XX XX XX XX" },
