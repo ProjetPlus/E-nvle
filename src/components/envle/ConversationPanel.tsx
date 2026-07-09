@@ -84,6 +84,7 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
           const time = lastMsg?.created_at ? new Date(lastMsg.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
           const otherMember = (allMembers || []).find((m) => m.conversation_id === c.id && m.user_id !== user.id);
           const otherProfile = otherMember ? profileById.get(otherMember.user_id) : null;
+          const memberCount = (allMembers || []).filter((m) => m.conversation_id === c.id).length;
           const displayName = !c.is_group && otherProfile ? otherProfile.full_name || otherProfile.phone || c.name : c.name || "Conversation";
           const lastSeen = otherProfile?.last_seen ? new Date(otherProfile.last_seen).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
           return {
@@ -96,13 +97,16 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
             contactId: otherProfile?.id,
             phone: otherProfile?.phone,
             ephemeralTtl: c.ephemeral_ttl,
-          };
+            _memberCount: memberCount,
+          } as Conversation & { _memberCount: number };
         })
       );
-      setConversations(convList);
+      // Hide orphan/solo conversations (only current user, no other member) — created by mistake
+      setConversations(convList.filter((c: any) => c._memberCount > 1 || c.isSquare));
     }
     setLoading(false);
   };
+
 
   const searchContacts = async (q: string) => {
     setContactSearch(q);
