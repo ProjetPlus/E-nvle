@@ -123,31 +123,45 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
 
   const createConversation = async (contactId?: string) => {
     if (!user) { toast.error("Connectez-vous d'abord"); return; }
-    const name = newConvName.trim() || "Nouvelle conversation";
+    if (!contactId) { toast.error("Sélectionnez un contact"); return; }
 
-    const { data: conv, error } = await supabase.from("conversations").insert({ name, created_by: user.id, is_group: !!newConvName.trim() }).select().single();
-    if (error || !conv) { toast.error("❌ Erreur de création"); return; }
-
-    const { error: memberError } = await supabase.from("conversation_members").insert([{ conversation_id: conv.id, user_id: user.id, role: "admin" }] as any);
-    if (memberError) { toast.error(memberError.message); return; }
-    if (contactId) {
-      const { error: contactError } = await supabase.from("conversation_members").insert({ conversation_id: conv.id, user_id: contactId, role: "member" });
-      if (contactError) { toast.error(contactError.message); return; }
+    // Look for existing 1-1 conversation with this contact
+    const { data: myMemberships } = await supabase.from("conversation_members").select("conversation_id").eq("user_id", user.id);
+    const convIds = (myMemberships || []).map((m) => m.conversation_id);
+    let conversationId: string | undefined;
+    if (convIds.length > 0) {
+      const { data: existing } = await supabase.from("conversation_members").select("conversation_id").in("conversation_id", convIds).eq("user_id", contactId).limit(1);
+      conversationId = existing?.[0]?.conversation_id;
     }
 
-    toast.success("✅ Conversation créée!");
+    let convName = "Conversation";
+    if (!conversationId) {
+      const { data: conv, error } = await supabase.from("conversations").insert({ name: "Conversation", created_by: user.id, is_group: false }).select().single();
+      if (error || !conv) { toast.error("❌ Erreur de création"); return; }
+      conversationId = conv.id;
+      const { error: memberError } = await supabase.from("conversation_members").insert([
+        { conversation_id: conv.id, user_id: user.id, role: "admin" },
+        { conversation_id: conv.id, user_id: contactId, role: "member" },
+      ] as any);
+      if (memberError) { toast.error(memberError.message); return; }
+      convName = conv.name;
+    }
+
+    const contact = contacts.find((c) => c.id === contactId);
+    toast.success("✅ Conversation ouverte");
     setShowNewConv(false);
-    setNewConvName("");
     setContactSearch("");
     setContacts([]);
     fetchConversations();
 
     onSelectConv({
-      id: conv.id, name, lastMsg: "", time: "", avatar: name[0]?.toUpperCase() || "💬",
-      avatarStyle: conv.avatar_style || "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))",
-      isSquare: false, status: "", ephemeralTtl: conv.ephemeral_ttl,
+      id: conversationId!, name: contact?.name || convName, lastMsg: "", time: "",
+      avatar: (contact?.name || convName)[0]?.toUpperCase() || "💬",
+      avatarStyle: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))",
+      isSquare: false, status: "", contactId,
     });
   };
+
 
   const filtered = conversations.filter((c) => {
     if (searchQuery) {
