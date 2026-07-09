@@ -341,7 +341,56 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
         )}
       </AnimatePresence>
 
-      {/* QR Code overlay */}
+      {/* About overlay */}
+      <AnimatePresence>
+        {activeSection === "about" && (
+          <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 30 }} transition={{ type: "spring", damping: 25 }} className="absolute inset-0 z-50 bg-background flex flex-col">
+            <div className="px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3">
+              <motion.button whileTap={{ scale: 0.85 }} className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center" onClick={() => setActiveSection(null)}>←</motion.button>
+              <h3 className="font-display text-xl font-bold">À propos d'E'nvlé</h3>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 scrollbar-thin flex flex-col gap-6">
+              <section className="rounded-2xl border border-primary/30 bg-primary/5 p-5">
+                <h4 className="font-display text-2xl font-bold text-envle-vert-light mb-1">E'nvlé One</h4>
+                <p className="text-xs text-envle-text-muted mb-3">Connecter. Créer. Célébrer.</p>
+                <p className="text-sm leading-relaxed">Le super app africain pour la messagerie, les communautés, le commerce, l'emploi et le portefeuille — au service de la souveraineté numérique du continent.</p>
+              </section>
+
+              <section>
+                <h5 className="text-xs font-bold text-envle-text-muted uppercase tracking-wider mb-2">Vision</h5>
+                <p className="text-sm leading-relaxed">Bâtir la plateforme de communication panafricaine qui permet à chacun de se connecter, entreprendre et prospérer dans un espace numérique souverain, sûr et pensé pour les réalités africaines.</p>
+              </section>
+
+              <section>
+                <h5 className="text-xs font-bold text-envle-text-muted uppercase tracking-wider mb-2">Mission</h5>
+                <p className="text-sm leading-relaxed">Offrir aux populations africaines un outil unifié — messagerie chiffrée, appels HD, communautés, boutique, emplois, portefeuille mobile — accessible, moderne et adapté aux usages locaux.</p>
+              </section>
+
+              <section className="rounded-2xl border border-envle-border bg-envle-card p-5">
+                <h5 className="text-xs font-bold text-envle-text-muted uppercase tracking-wider mb-4">Fondateur & Développeur</h5>
+                <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
+                  <img src={founderAsset.url} alt="Inocent KOFFI" className="w-28 h-28 rounded-2xl object-cover border-2 border-primary" />
+                  <div className="flex-1 min-w-0 text-center sm:text-left">
+                    <div className="font-display text-lg font-bold">Inocent KOFFI</div>
+                    <div className="text-xs text-envle-vert-light font-semibold mb-1">Fondateur · Développeur de E'nvlé</div>
+                    <div className="text-xs text-envle-text-muted mb-3">🇨🇮 Côte d'Ivoire</div>
+                    <div className="flex flex-col gap-1 text-xs">
+                      <a href="tel:+2250759566087" className="text-foreground hover:text-primary">📞 +225 07 59 56 60 87</a>
+                      <a href="mailto:inocent.koffi@ivoireprojet.com" className="text-foreground hover:text-primary break-all">✉️ inocent.koffi@ivoireprojet.com</a>
+                      <a href="mailto:innocentkoffi1@gmail.com" className="text-foreground hover:text-primary break-all">✉️ innocentkoffi1@gmail.com</a>
+                      <a href="mailto:ikoffi@agricapital.ci" className="text-foreground hover:text-primary break-all">✉️ ikoffi@agricapital.ci</a>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <p className="text-center text-[11px] text-envle-text-muted">© {new Date().getFullYear()} E'nvlé One · Version bêta production</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
       <AnimatePresence>
         {showQR && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/70 backdrop-blur-sm flex items-center justify-center" onClick={() => setShowQR(false)}>
