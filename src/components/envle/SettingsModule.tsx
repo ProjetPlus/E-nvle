@@ -6,6 +6,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import QRCodeDisplay from "./QRCodeDisplay";
 import { processProfileImage } from "@/lib/image-processing";
+import founderAsset from "@/assets/inocent-koffi.jpg.asset.json";
+
 
 const languages = [
   { code: "fr", label: "Français", flag: "🇫🇷" },
