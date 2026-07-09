@@ -314,6 +314,7 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
             </>
           ) : <div className="text-sm font-bold truncate text-envle-text-muted">Messages</div>}
         </div>
+        {conv.id && (
         <div className="flex gap-1 relative">
           {[
             { icon: "✨", action: onOpenStories, title: "Stories" },
@@ -335,6 +336,8 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
             </motion.button>
           ))}
         </div>
+        )}
+
       </motion.div>
 
       <AnimatePresence>
