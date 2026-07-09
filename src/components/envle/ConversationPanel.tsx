@@ -44,7 +44,7 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewConv, setShowNewConv] = useState(false);
-  const [newConvName, setNewConvName] = useState("");
+  // (removed) newConvName — modal no longer needs a name input
   const [contactSearch, setContactSearch] = useState("");
   const [contacts, setContacts] = useState<{ id: string; name: string; email: string; avatarUrl?: string | null; isOnline?: boolean }[]>([]);
   const [searchingContacts, setSearchingContacts] = useState(false);
