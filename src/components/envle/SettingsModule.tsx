@@ -6,6 +6,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import QRCodeDisplay from "./QRCodeDisplay";
 import { processProfileImage } from "@/lib/image-processing";
+import founderAsset from "@/assets/inocent-koffi.jpg.asset.json";
+
 
 const languages = [
   { code: "fr", label: "Français", flag: "🇫🇷" },
@@ -229,17 +231,18 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
             <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 scrollbar-thin">
               {requireProfile && <div className="rounded-2xl border border-envle-or/30 bg-envle-or/10 p-3 text-sm text-envle-or">Complétez votre profil pour accéder à E'nvlé One.</div>}
               <label className="relative min-h-40 rounded-2xl border border-envle-border overflow-hidden cursor-pointer bg-foreground/[0.06] flex items-center justify-center group">
-                {profile.coverUrl ? <img src={profile.coverUrl} alt="Photo de couverture" className="absolute inset-0 w-full h-full object-cover" /> : <span className="text-xs text-envle-text-muted">Photo de couverture obligatoire</span>}
-                <span className="absolute inset-x-4 bottom-3 px-3 py-2 rounded-xl bg-background/90 border border-envle-border text-xs font-semibold text-center">📷 Importer une photo de couverture obligatoire</span>
+                {profile.coverUrl ? <img src={profile.coverUrl} alt="Photo de couverture" className="absolute inset-0 w-full h-full object-cover" /> : <span className="text-xs text-envle-text-muted">Photo de couverture</span>}
+                <span className="absolute right-3 bottom-3 px-3 py-1.5 rounded-lg bg-background/90 border border-envle-border text-[11px] font-semibold">📷 Couverture</span>
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadProfileMedia(e.target.files[0], "cover")} />
               </label>
-              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-3 mb-4">
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-2 mb-4">
                 <label className="w-24 h-24 rounded-full flex items-center justify-center text-4xl font-bold border-4 border-primary overflow-hidden cursor-pointer" style={{ background: profile.avatarStyle }}>
                   {profile.avatarUrl ? <img src={profile.avatarUrl} alt="Photo profil" className="w-full h-full object-cover" /> : profile.avatar}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadProfileMedia(e.target.files[0], "avatar")} />
                 </label>
-                <span className="text-xs text-primary font-semibold">📷 Importer une photo de profil obligatoire</span>
+                <span className="text-[11px] text-primary font-semibold">📷 Photo de profil</span>
               </motion.div>
+
               {[
                 { key: "name", label: "Nom complet", placeholder: "Votre nom" },
                 { key: "phone", label: "Téléphone", placeholder: "+225 XX XX XX XX" },
@@ -338,7 +341,56 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
         )}
       </AnimatePresence>
 
-      {/* QR Code overlay */}
+      {/* About overlay */}
+      <AnimatePresence>
+        {activeSection === "about" && (
+          <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 30 }} transition={{ type: "spring", damping: 25 }} className="absolute inset-0 z-50 bg-background flex flex-col">
+            <div className="px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3">
+              <motion.button whileTap={{ scale: 0.85 }} className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center" onClick={() => setActiveSection(null)}>←</motion.button>
+              <h3 className="font-display text-xl font-bold">À propos d'E'nvlé</h3>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 scrollbar-thin flex flex-col gap-6">
+              <section className="rounded-2xl border border-primary/30 bg-primary/5 p-5">
+                <h4 className="font-display text-2xl font-bold text-envle-vert-light mb-1">E'nvlé One</h4>
+                <p className="text-xs text-envle-text-muted mb-3">Connecter. Créer. Célébrer.</p>
+                <p className="text-sm leading-relaxed">Le super app africain pour la messagerie, les communautés, le commerce, l'emploi et le portefeuille — au service de la souveraineté numérique du continent.</p>
+              </section>
+
+              <section>
+                <h5 className="text-xs font-bold text-envle-text-muted uppercase tracking-wider mb-2">Vision</h5>
+                <p className="text-sm leading-relaxed">Bâtir la plateforme de communication panafricaine qui permet à chacun de se connecter, entreprendre et prospérer dans un espace numérique souverain, sûr et pensé pour les réalités africaines.</p>
+              </section>
+
+              <section>
+                <h5 className="text-xs font-bold text-envle-text-muted uppercase tracking-wider mb-2">Mission</h5>
+                <p className="text-sm leading-relaxed">Offrir aux populations africaines un outil unifié — messagerie chiffrée, appels HD, communautés, boutique, emplois, portefeuille mobile — accessible, moderne et adapté aux usages locaux.</p>
+              </section>
+
+              <section className="rounded-2xl border border-envle-border bg-envle-card p-5">
+                <h5 className="text-xs font-bold text-envle-text-muted uppercase tracking-wider mb-4">Fondateur & Développeur</h5>
+                <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
+                  <img src={founderAsset.url} alt="Inocent KOFFI" className="w-28 h-28 rounded-2xl object-cover border-2 border-primary" />
+                  <div className="flex-1 min-w-0 text-center sm:text-left">
+                    <div className="font-display text-lg font-bold">Inocent KOFFI</div>
+                    <div className="text-xs text-envle-vert-light font-semibold mb-1">Fondateur · Développeur de E'nvlé</div>
+                    <div className="text-xs text-envle-text-muted mb-3">🇨🇮 Côte d'Ivoire</div>
+                    <div className="flex flex-col gap-1 text-xs">
+                      <a href="tel:+2250759566087" className="text-foreground hover:text-primary">📞 +225 07 59 56 60 87</a>
+                      <a href="mailto:inocent.koffi@ivoireprojet.com" className="text-foreground hover:text-primary break-all">✉️ inocent.koffi@ivoireprojet.com</a>
+                      <a href="mailto:innocentkoffi1@gmail.com" className="text-foreground hover:text-primary break-all">✉️ innocentkoffi1@gmail.com</a>
+                      <a href="mailto:ikoffi@agricapital.ci" className="text-foreground hover:text-primary break-all">✉️ ikoffi@agricapital.ci</a>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <p className="text-center text-[11px] text-envle-text-muted">© {new Date().getFullYear()} E'nvlé One · Version bêta production</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
       <AnimatePresence>
         {showQR && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/70 backdrop-blur-sm flex items-center justify-center" onClick={() => setShowQR(false)}>

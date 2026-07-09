@@ -66,12 +66,9 @@ const AuthModal = ({ open, onClose, locked = false }: Props) => {
     toast.success("📱 Code OTP simulé généré");
   };
 
-  const verifyOTP = async () => {
-    const code = otpCode.join("");
-    if (code.length !== 6) {
-      toast.error("Entrez le code à 6 chiffres");
-      return;
-    }
+  const verifyOTP = async (codeOverride?: string) => {
+    const code = codeOverride ?? otpCode.join("");
+    if (code.length !== 6) return;
     setLoading(true);
     const { data, error } = await supabase.functions.invoke("phone-auth", {
       body: { action: "verify", phone: fullPhone, code, fullName: fullName || phoneToDisplayName(fullPhone) },
@@ -91,6 +88,14 @@ const AuthModal = ({ open, onClose, locked = false }: Props) => {
     resetForm();
     onClose();
   };
+
+  // Auto-verify when 6 digits entered
+  useEffect(() => {
+    const code = otpCode.join("");
+    if (step === "otp" && code.length === 6 && !loading) void verifyOTP(code);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otpCode, step]);
+
 
   const resetForm = () => {
     setStep("phone");
@@ -159,7 +164,7 @@ const AuthModal = ({ open, onClose, locked = false }: Props) => {
                     {otpCode.map((digit, i) => <input key={i} ref={(el) => { inputRefs.current[i] = el; }} type="text" inputMode="numeric" maxLength={1} value={digit} onChange={(e) => handleOtpInput(i, e.target.value)} onKeyDown={(e) => handleOtpKeyDown(i, e)} className="w-11 md:w-12 h-14 text-center text-2xl font-bold bg-foreground/[0.06] border border-envle-border rounded-xl text-foreground outline-none focus:border-primary focus:shadow-[0_0_0_3px_hsla(142,47%,33%,0.15)] transition-all" />)}
                   </div>
                   {countdown > 0 && <p className="text-center text-xs text-envle-text-muted mb-3">⏱️ Expire dans <span className="text-envle-or font-bold">{formatCountdown(countdown)}</span></p>}
-                  <motion.button whileTap={{ scale: 0.97 }} whileHover={{ y: -2 }} disabled={loading} className="w-full py-3.5 rounded-[14px] border-none text-primary-foreground font-body text-[15px] font-bold cursor-pointer transition-all shadow-[0_4px_20px_hsla(142,47%,33%,0.4)] disabled:opacity-50 bg-primary" onClick={verifyOTP}>{loading ? "⏳ Vérification..." : "✅ Vérifier et entrer"}</motion.button>
+                  <motion.button whileTap={{ scale: 0.97 }} whileHover={{ y: -2 }} disabled={loading} className="w-full py-3.5 rounded-[14px] border-none text-primary-foreground font-body text-[15px] font-bold cursor-pointer transition-all shadow-[0_4px_20px_hsla(142,47%,33%,0.4)] disabled:opacity-50 bg-primary" onClick={() => verifyOTP()}>{loading ? "⏳ Connexion..." : "Entrer"}</motion.button>
                   <div className="flex justify-between mt-3">
                     <motion.button whileTap={{ scale: 0.95 }} className="text-xs text-envle-text-muted hover:text-foreground bg-transparent border-none cursor-pointer font-body" onClick={resetForm}>← Changer de numéro</motion.button>
                     <motion.button whileTap={{ scale: 0.95 }} disabled={countdown > 240} className="text-xs text-primary hover:text-envle-vert-light bg-transparent border-none cursor-pointer font-body disabled:opacity-30" onClick={requestOTP}>🔄 Renvoyer</motion.button>
