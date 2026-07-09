@@ -306,20 +306,15 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
             >
               <h3 className="font-display text-lg font-bold mb-4">Nouvelle conversation</h3>
               <input
+                autoFocus
                 className="w-full bg-foreground/[0.06] border border-envle-border rounded-xl px-4 py-3 text-foreground font-body text-sm mb-3 outline-none focus:border-primary placeholder:text-envle-text-muted"
-                placeholder="Nom de la conversation (optionnel)"
-                value={newConvName}
-                onChange={(e) => setNewConvName(e.target.value)}
-              />
-              <input
-                className="w-full bg-foreground/[0.06] border border-envle-border rounded-xl px-4 py-3 text-foreground font-body text-sm mb-3 outline-none focus:border-primary placeholder:text-envle-text-muted"
-                placeholder="🔍 Rechercher un contact..."
+                placeholder="🔍 Rechercher par nom ou numéro"
                 value={contactSearch}
                 onChange={(e) => searchContacts(e.target.value)}
               />
               {searchingContacts && <p className="text-xs text-envle-text-muted mb-2">Recherche...</p>}
-              {contacts.length > 0 && (
-                <div className="max-h-[200px] overflow-y-auto mb-3 flex flex-col gap-1">
+              {contacts.length > 0 ? (
+                <div className="max-h-[320px] overflow-y-auto mb-3 flex flex-col gap-1">
                   {contacts.map((c) => (
                     <motion.button
                       key={c.id}
@@ -328,26 +323,19 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
                       className="flex items-center gap-3 px-3 py-2.5 rounded-xl border-none bg-foreground/[0.04] hover:bg-primary/10 cursor-pointer w-full text-left transition-colors"
                       onClick={() => createConversation(c.id)}
                     >
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold overflow-hidden relative">{c.avatarUrl ? <img src={c.avatarUrl} alt={c.name} className="w-full h-full object-cover" /> : c.name[0]}{c.isOnline && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-primary border border-envle-card" />}</div>
+                      <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold overflow-hidden relative">{c.avatarUrl ? <img src={c.avatarUrl} alt={c.name} className="w-full h-full object-cover" /> : c.name[0]}{c.isOnline && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-primary border border-envle-card" />}</div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold">{c.name} <span className="text-primary text-[10px]">◉</span></div>
+                        <div className="text-sm font-semibold truncate">{c.name}</div>
                         <div className="text-[11px] text-envle-text-muted truncate">{c.email}</div>
                       </div>
                     </motion.button>
                   ))}
                 </div>
+              ) : (
+                !searchingContacts && contactSearch.length >= 2 && <p className="text-xs text-envle-text-muted mb-3 text-center py-4">Aucun contact E'nvlé trouvé</p>
               )}
-              <div className="flex gap-2">
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  className="flex-1 py-2.5 rounded-xl border-none text-sm font-semibold cursor-pointer text-primary-foreground"
-                  style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }}
-                  onClick={() => createConversation()}
-                >
-                  Créer
-                </motion.button>
-                <button className="px-5 py-2.5 rounded-xl border border-envle-border bg-transparent text-sm text-envle-text-muted cursor-pointer font-body" onClick={() => setShowNewConv(false)}>Annuler</button>
-              </div>
+              <button className="w-full py-2.5 rounded-xl border border-envle-border bg-transparent text-sm text-envle-text-muted cursor-pointer font-body" onClick={() => setShowNewConv(false)}>Annuler</button>
+
             </motion.div>
           </motion.div>
         )}
