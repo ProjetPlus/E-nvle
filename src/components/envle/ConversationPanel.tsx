@@ -44,7 +44,7 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewConv, setShowNewConv] = useState(false);
-  const [newConvName, setNewConvName] = useState("");
+  // (removed) newConvName — modal no longer needs a name input
   const [contactSearch, setContactSearch] = useState("");
   const [contacts, setContacts] = useState<{ id: string; name: string; email: string; avatarUrl?: string | null; isOnline?: boolean }[]>([]);
   const [searchingContacts, setSearchingContacts] = useState(false);
@@ -84,6 +84,7 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
           const time = lastMsg?.created_at ? new Date(lastMsg.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
           const otherMember = (allMembers || []).find((m) => m.conversation_id === c.id && m.user_id !== user.id);
           const otherProfile = otherMember ? profileById.get(otherMember.user_id) : null;
+          const memberCount = (allMembers || []).filter((m) => m.conversation_id === c.id).length;
           const displayName = !c.is_group && otherProfile ? otherProfile.full_name || otherProfile.phone || c.name : c.name || "Conversation";
           const lastSeen = otherProfile?.last_seen ? new Date(otherProfile.last_seen).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
           return {
@@ -96,13 +97,16 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
             contactId: otherProfile?.id,
             phone: otherProfile?.phone,
             ephemeralTtl: c.ephemeral_ttl,
-          };
+            _memberCount: memberCount,
+          } as Conversation & { _memberCount: number };
         })
       );
-      setConversations(convList);
+      // Hide orphan/solo conversations (only current user, no other member) — created by mistake
+      setConversations(convList.filter((c: any) => c._memberCount > 1 || c.isSquare));
     }
     setLoading(false);
   };
+
 
   const searchContacts = async (q: string) => {
     setContactSearch(q);
@@ -119,31 +123,45 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
 
   const createConversation = async (contactId?: string) => {
     if (!user) { toast.error("Connectez-vous d'abord"); return; }
-    const name = newConvName.trim() || "Nouvelle conversation";
+    if (!contactId) { toast.error("Sélectionnez un contact"); return; }
 
-    const { data: conv, error } = await supabase.from("conversations").insert({ name, created_by: user.id, is_group: !!newConvName.trim() }).select().single();
-    if (error || !conv) { toast.error("❌ Erreur de création"); return; }
-
-    const { error: memberError } = await supabase.from("conversation_members").insert([{ conversation_id: conv.id, user_id: user.id, role: "admin" }] as any);
-    if (memberError) { toast.error(memberError.message); return; }
-    if (contactId) {
-      const { error: contactError } = await supabase.from("conversation_members").insert({ conversation_id: conv.id, user_id: contactId, role: "member" });
-      if (contactError) { toast.error(contactError.message); return; }
+    // Look for existing 1-1 conversation with this contact
+    const { data: myMemberships } = await supabase.from("conversation_members").select("conversation_id").eq("user_id", user.id);
+    const convIds = (myMemberships || []).map((m) => m.conversation_id);
+    let conversationId: string | undefined;
+    if (convIds.length > 0) {
+      const { data: existing } = await supabase.from("conversation_members").select("conversation_id").in("conversation_id", convIds).eq("user_id", contactId).limit(1);
+      conversationId = existing?.[0]?.conversation_id;
     }
 
-    toast.success("✅ Conversation créée!");
+    let convName = "Conversation";
+    if (!conversationId) {
+      const { data: conv, error } = await supabase.from("conversations").insert({ name: "Conversation", created_by: user.id, is_group: false }).select().single();
+      if (error || !conv) { toast.error("❌ Erreur de création"); return; }
+      conversationId = conv.id;
+      const { error: memberError } = await supabase.from("conversation_members").insert([
+        { conversation_id: conv.id, user_id: user.id, role: "admin" },
+        { conversation_id: conv.id, user_id: contactId, role: "member" },
+      ] as any);
+      if (memberError) { toast.error(memberError.message); return; }
+      convName = conv.name;
+    }
+
+    const contact = contacts.find((c) => c.id === contactId);
+    toast.success("✅ Conversation ouverte");
     setShowNewConv(false);
-    setNewConvName("");
     setContactSearch("");
     setContacts([]);
     fetchConversations();
 
     onSelectConv({
-      id: conv.id, name, lastMsg: "", time: "", avatar: name[0]?.toUpperCase() || "💬",
-      avatarStyle: conv.avatar_style || "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))",
-      isSquare: false, status: "", ephemeralTtl: conv.ephemeral_ttl,
+      id: conversationId!, name: contact?.name || convName, lastMsg: "", time: "",
+      avatar: (contact?.name || convName)[0]?.toUpperCase() || "💬",
+      avatarStyle: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))",
+      isSquare: false, status: "", contactId,
     });
   };
+
 
   const filtered = conversations.filter((c) => {
     if (searchQuery) {
@@ -288,20 +306,15 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
             >
               <h3 className="font-display text-lg font-bold mb-4">Nouvelle conversation</h3>
               <input
+                autoFocus
                 className="w-full bg-foreground/[0.06] border border-envle-border rounded-xl px-4 py-3 text-foreground font-body text-sm mb-3 outline-none focus:border-primary placeholder:text-envle-text-muted"
-                placeholder="Nom de la conversation (optionnel)"
-                value={newConvName}
-                onChange={(e) => setNewConvName(e.target.value)}
-              />
-              <input
-                className="w-full bg-foreground/[0.06] border border-envle-border rounded-xl px-4 py-3 text-foreground font-body text-sm mb-3 outline-none focus:border-primary placeholder:text-envle-text-muted"
-                placeholder="🔍 Rechercher un contact..."
+                placeholder="🔍 Rechercher par nom ou numéro"
                 value={contactSearch}
                 onChange={(e) => searchContacts(e.target.value)}
               />
               {searchingContacts && <p className="text-xs text-envle-text-muted mb-2">Recherche...</p>}
-              {contacts.length > 0 && (
-                <div className="max-h-[200px] overflow-y-auto mb-3 flex flex-col gap-1">
+              {contacts.length > 0 ? (
+                <div className="max-h-[320px] overflow-y-auto mb-3 flex flex-col gap-1">
                   {contacts.map((c) => (
                     <motion.button
                       key={c.id}
@@ -310,26 +323,19 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
                       className="flex items-center gap-3 px-3 py-2.5 rounded-xl border-none bg-foreground/[0.04] hover:bg-primary/10 cursor-pointer w-full text-left transition-colors"
                       onClick={() => createConversation(c.id)}
                     >
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold overflow-hidden relative">{c.avatarUrl ? <img src={c.avatarUrl} alt={c.name} className="w-full h-full object-cover" /> : c.name[0]}{c.isOnline && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-primary border border-envle-card" />}</div>
+                      <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold overflow-hidden relative">{c.avatarUrl ? <img src={c.avatarUrl} alt={c.name} className="w-full h-full object-cover" /> : c.name[0]}{c.isOnline && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-primary border border-envle-card" />}</div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold">{c.name} <span className="text-primary text-[10px]">◉</span></div>
+                        <div className="text-sm font-semibold truncate">{c.name}</div>
                         <div className="text-[11px] text-envle-text-muted truncate">{c.email}</div>
                       </div>
                     </motion.button>
                   ))}
                 </div>
+              ) : (
+                !searchingContacts && contactSearch.length >= 2 && <p className="text-xs text-envle-text-muted mb-3 text-center py-4">Aucun contact E'nvlé trouvé</p>
               )}
-              <div className="flex gap-2">
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  className="flex-1 py-2.5 rounded-xl border-none text-sm font-semibold cursor-pointer text-primary-foreground"
-                  style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }}
-                  onClick={() => createConversation()}
-                >
-                  Créer
-                </motion.button>
-                <button className="px-5 py-2.5 rounded-xl border border-envle-border bg-transparent text-sm text-envle-text-muted cursor-pointer font-body" onClick={() => setShowNewConv(false)}>Annuler</button>
-              </div>
+              <button className="w-full py-2.5 rounded-xl border border-envle-border bg-transparent text-sm text-envle-text-muted cursor-pointer font-body" onClick={() => setShowNewConv(false)}>Annuler</button>
+
             </motion.div>
           </motion.div>
         )}
