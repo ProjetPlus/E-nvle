@@ -16,7 +16,7 @@ const queryClient = new QueryClient();
 const AuthRoute = () => {
   const { user, profile, loading } = useAuth();
   if (loading) return <div className="h-screen grid place-items-center bg-background text-envle-text-muted">Chargement...</div>;
-  if (user && profile && !profile.profile_completed) return <Navigate to="/profile" replace />;
+  if (user && profile?.profile_completed !== true) return <Navigate to="/profile" replace />;
   if (user) return <Navigate to="/app" replace />;
   return <Index authOnly />;
 };
@@ -26,7 +26,7 @@ const ProtectedRoute = ({ profileOnly = false }: { profileOnly?: boolean }) => {
   const location = useLocation();
   if (loading) return <div className="h-screen grid place-items-center bg-background text-envle-text-muted">Chargement...</div>;
   if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
-  if (!profileOnly && profile && !profile.profile_completed) return <Navigate to="/profile" replace />;
+  if (!profileOnly && profile?.profile_completed !== true) return <Navigate to="/profile" replace />;
   return <Index initialNav={profileOnly ? "settings" : "chat"} forceProfile={profileOnly} />;
 };
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,6 +46,20 @@ const ContactDiscoveryModal = ({ open, onClose, onSelectConversation }: Props) =
   const [contactQuery, setContactQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const canUseNativeContacts = useMemo(() => Boolean((navigator as ContactNavigator).contacts?.select), []);
+
+  useEffect(() => {
+    if (!open || !user) return;
+    const loadSaved = async () => {
+      const { data } = await supabase.from("contacts").select("contact_id").eq("user_id", user.id).eq("status", "active");
+      const ids = (data || []).map((contact) => contact.contact_id);
+      if (!ids.length) return;
+      const { data: profiles } = await supabase.from("profiles").select("id, full_name, phone, avatar_url, status, last_seen").in("id", ids);
+      setMatches((profiles || []).map((profile) => ({ id: profile.id, name: profile.full_name || profile.phone || "Contact", phone: profile.phone || "", avatarUrl: profile.avatar_url, status: profile.status, lastSeen: profile.last_seen })));
+    };
+    void loadSaved();
+    const channel = supabase.channel(`contacts-live-${user.id}`).on("postgres_changes", { event: "*", schema: "public", table: "contacts", filter: `user_id=eq.${user.id}` }, () => void loadSaved()).subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [open, user?.id]);
 
   const findRegisteredProfiles = async (phones: string[], names = new Map<string, string>()) => {
     if (!user || phones.length === 0) { setMatches([]); return; }

@@ -30,8 +30,14 @@ const StoriesModule = ({ onBack }: { onBack: () => void }) => {
   const { user } = useAuth();
 
   useEffect(() => {
-    fetchStories();
-  }, []);
+    if (!user) return;
+    void fetchStories();
+    const channel = supabase.channel(`stories-live-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "stories" }, () => void fetchStories())
+      .on("postgres_changes", { event: "*", schema: "public", table: "story_views" }, () => void fetchStories())
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [user?.id]);
 
   const fetchStories = async () => {
     setLoading(true);
@@ -83,13 +89,14 @@ const StoriesModule = ({ onBack }: { onBack: () => void }) => {
 
     const caption = prompt("Ajouter une légende (optionnel):") || "";
 
-    await supabase.from("stories").insert({
+    const { error: insertError } = await supabase.from("stories").insert({
       user_id: user.id,
       media_url: urlData.publicUrl,
       media_type: mediaType,
       caption,
     });
 
+    if (insertError) { toast.error(insertError.message); setCreating(false); return; }
     toast.success("✅ Story publiée!");
     setCreating(false);
     fetchStories();
@@ -108,6 +115,20 @@ const StoriesModule = ({ onBack }: { onBack: () => void }) => {
     setStories((prev) =>
       prev.map((s) => (s.id === id ? { ...s, liked: !s.liked, views: s.liked ? s.views - 1 : s.views + 1 } : s))
     );
+  };
+
+  const editStory = async (story: Story) => {
+    if (story.userId !== user?.id) return;
+    const caption = window.prompt("Modifier la légende", story.caption);
+    if (caption === null) return;
+    const { error } = await supabase.from("stories").update({ caption }).eq("id", story.id).eq("user_id", user.id);
+    if (error) toast.error(error.message); else toast.success("Story modifiée");
+  };
+
+  const deleteStory = async (story: Story) => {
+    if (story.userId !== user?.id || !window.confirm("Supprimer cette story ?")) return;
+    const { error } = await supabase.from("stories").delete().eq("id", story.id).eq("user_id", user.id);
+    if (error) toast.error(error.message); else { setViewingStory(null); toast.success("Story supprimée"); }
   };
 
   const filtered = stories.filter((s) => {
@@ -184,6 +205,7 @@ const StoriesModule = ({ onBack }: { onBack: () => void }) => {
                   onClick={() => handleView(story)}
                 >
                   <div className="aspect-[3/4] relative overflow-hidden">
+                    {story.userId === user?.id && <div className="absolute z-20 top-2 left-2 flex gap-1"><button title="Modifier" className="w-8 h-8 rounded-full bg-background/80 border-none cursor-pointer" onClick={(event) => { event.stopPropagation(); void editStory(story); }}>✏️</button><button title="Supprimer" className="w-8 h-8 rounded-full bg-destructive/80 border-none cursor-pointer" onClick={(event) => { event.stopPropagation(); void deleteStory(story); }}>🗑️</button></div>}
                     {story.mediaUrl ? (
                       <img src={story.mediaUrl} alt={story.caption} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     ) : (
