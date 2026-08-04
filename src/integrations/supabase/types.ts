@@ -1055,6 +1055,7 @@ export type Database = {
     Functions: {
       cleanup_ephemeral_messages: { Args: never; Returns: undefined }
       generate_otp: { Args: { p_email: string }; Returns: Json }
+      has_completed_profile: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
