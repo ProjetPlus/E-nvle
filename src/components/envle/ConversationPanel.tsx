@@ -166,8 +166,49 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
     });
   };
 
+  const renameConversation = async () => {
+    if (!renaming) return;
+    const { error } = await supabase.from("conversations").update({ name: renaming.name.trim() || "Conversation" }).eq("id", renaming.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("✅ Conversation renommée");
+    setRenaming(null);
+    setMenuConv(null);
+    fetchConversations();
+  };
+
+  const markConversationRead = async (conv: Conversation) => {
+    if (!user) return;
+    await supabase.from("messages").update({ is_read: true }).eq("conversation_id", conv.id).neq("sender_id", user.id);
+    await supabase.from("conversation_members").update({ last_read_at: new Date().toISOString() }).eq("conversation_id", conv.id).eq("user_id", user.id);
+    setMenuConv(null);
+    fetchConversations();
+  };
+
+  const deleteConversation = async (conv: Conversation) => {
+    if (!user) return;
+    if (!window.confirm(`Supprimer définitivement « ${conv.name} » ?`)) return;
+    await supabase.from("messages").delete().eq("conversation_id", conv.id);
+    await supabase.from("conversation_members").delete().eq("conversation_id", conv.id);
+    const { error } = await supabase.from("conversations").delete().eq("id", conv.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("🗑️ Conversation supprimée");
+    setMenuConv(null);
+    if (activeConvId === conv.id) onSelectConv({ id: "", name: "", lastMsg: "", time: "", avatar: "💬", avatarStyle: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))", status: "" });
+    fetchConversations();
+  };
+
+  const leaveConversation = async (conv: Conversation) => {
+    if (!user) return;
+    const { error } = await supabase.from("conversation_members").delete().eq("conversation_id", conv.id).eq("user_id", user.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("👋 Vous avez quitté la conversation");
+    setMenuConv(null);
+    if (activeConvId === conv.id) onSelectConv({ id: "", name: "", lastMsg: "", time: "", avatar: "💬", avatarStyle: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))", status: "" });
+    fetchConversations();
+  };
 
   const filtered = conversations.filter((c) => {
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       if (!c.name.toLowerCase().includes(q) && !c.lastMsg.toLowerCase().includes(q)) return false;
