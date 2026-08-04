@@ -51,6 +51,9 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
   const [contactsOpen, setContactsOpen] = useState(false);
   const { user } = useAuth();
 
+  const [menuConv, setMenuConv] = useState<Conversation | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+
   useEffect(() => {
     if (!user) { setConversations([]); setLoading(false); return; }
     fetchConversations();
@@ -58,6 +61,7 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
       .channel("conversations-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => fetchConversations())
       .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => fetchConversations())
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversation_members" }, () => fetchConversations())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
