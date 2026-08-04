@@ -86,7 +86,7 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
   useRealtimeNotifications(user?.id, (notification) => setNotifications((prev) => [notification, ...prev].slice(0, 80)));
 
   const userInitials = profile?.full_name ? profile.full_name.substring(0, 2).toUpperCase() : user?.email ? user.email.substring(0, 2).toUpperCase() : "?";
-  const mustCompleteProfile = Boolean(user && profile && !profile.profile_completed);
+  const mustCompleteProfile = Boolean(user && profile?.profile_completed !== true);
 
   useEffect(() => {
     if (!profile) return;
@@ -144,6 +144,11 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
   }, []);
 
   const openCall = useCallback(async (type = "video") => {
+    if (profile?.profile_completed !== true) {
+      toast.error("Complétez votre profil avant de passer un appel");
+      setActiveNav("settings");
+      return;
+    }
     setCallType(type);
     setCallDirection(activeConv.contactId ? "outgoing" : "meeting");
     setCallPeer(activeConv.contactId ? activeConv : null);
@@ -164,7 +169,7 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
     }
     if (user && !activeConv.contactId) toast("Sélectionnez un contact pour lancer un appel réel");
     setCallOpen(true);
-  }, [activeConv.contactId, activeConv.id, user]);
+  }, [activeConv, profile?.profile_completed, user]);
 
   const handleSelectConv = useCallback((conv: Conversation) => {
     setActiveConv(conv);
@@ -217,7 +222,7 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
       {!authOnly && showSplash && <SplashScreen onFinish={handleSplashFinish} />}
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: authOnly || appVisible ? 1 : 0 }} transition={{ duration: 0.5 }} className="flex h-screen">
-        {user && !forceProfile && <Sidebar
+        {user && !forceProfile && !mustCompleteProfile && <Sidebar
           activeNav={activeNav}
           onNavChange={handleNavChange}
           onOpenAuth={() => setAuthOpen(true)}
@@ -227,7 +232,7 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
           userAvatarUrl={profile?.avatar_url || ""}
         />}
 
-        {user && !forceProfile && isMobile && appVisible && (
+        {user && !forceProfile && !mustCompleteProfile && isMobile && appVisible && (
           <motion.button
             whileTap={{ scale: 0.85 }}
             whileHover={{ scale: 1.05 }}
@@ -242,7 +247,7 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
       </motion.div>
 
       <AuthModal open={!authLoading && (authOpen || authOnly) && !user} locked onClose={() => setAuthOpen(false)} />
-      <CallModal open={callOpen} type={callType} convName={callPeer?.name || activeConv.name} convAvatar={callPeer?.avatar || activeConv.avatar} convAvatarStyle={callPeer?.avatarStyle || activeConv.avatarStyle} callId={currentCallId} direction={callDirection} remoteUserId={callDirection === "incoming" ? callPeer?.contactId : activeConv.contactId} onClose={() => setCallOpen(false)} />
+      <CallModal open={callOpen && profile?.profile_completed === true} type={callType} convName={callPeer?.name || activeConv.name} convAvatar={callPeer?.avatar || activeConv.avatar} convAvatarStyle={callPeer?.avatarStyle || activeConv.avatarStyle} callId={currentCallId} direction={callDirection} remoteUserId={callDirection === "incoming" ? callPeer?.contactId : activeConv.contactId} onClose={() => setCallOpen(false)} />
       <NotificationCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} notifications={notifications} onMarkAllRead={markAllRead} onClearAll={clearNotifications} />
       <CreateBusinessModal open={createModal.open} type={createModal.type} onClose={() => setCreateModal({ ...createModal, open: false })} />
     </div>

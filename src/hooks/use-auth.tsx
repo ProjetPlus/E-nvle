@@ -85,14 +85,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const hydrate = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      const { data: verified } = session ? await supabase.auth.getUser() : { data: { user: null } };
       if (!mounted) return;
-      const activeUser = verified.user ?? null;
+      const activeUser = session?.user ?? null;
       setSession(session);
       setUser(activeUser);
       registerCurrentDevice(activeUser?.id);
       await loadProfile(activeUser?.id);
       if (mounted) setLoading(false);
+      if (session) void supabase.auth.getUser();
     };
 
     void hydrate();
@@ -103,8 +103,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const activeUser = session?.user ?? null;
         setUser(activeUser);
         registerCurrentDevice(activeUser?.id);
-        setTimeout(() => void loadProfile(activeUser?.id), 0);
-        setLoading(false);
+        setLoading(true);
+        setTimeout(() => void loadProfile(activeUser?.id).finally(() => setLoading(false)), 0);
       }
     );
 
