@@ -393,6 +393,45 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Conversation options */}
+      <AnimatePresence>
+        {menuConv && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setMenuConv(null); setRenaming(null); }}>
+            <motion.div
+              initial={{ scale: 0.9, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 30 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-envle-card border border-envle-border rounded-3xl w-full max-w-[360px] p-5 flex flex-col gap-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="font-display text-lg font-bold mb-2 truncate">{menuConv.name}</h3>
+              {renaming ? (
+                <>
+                  <input
+                    autoFocus
+                    className="w-full bg-foreground/[0.06] border border-envle-border rounded-xl px-4 py-3 text-foreground font-body text-sm outline-none focus:border-primary"
+                    value={renaming.name}
+                    onChange={(e) => setRenaming({ ...renaming, name: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === "Enter") void renameConversation(); }}
+                  />
+                  <button className="w-full py-2.5 rounded-xl border-none bg-primary text-sm font-semibold text-primary-foreground cursor-pointer font-body" onClick={() => void renameConversation()}>💾 Enregistrer</button>
+                </>
+              ) : (
+                <>
+                  <button className="w-full py-2.5 rounded-xl border border-envle-border bg-foreground/[0.04] text-sm cursor-pointer font-body text-left px-4" onClick={() => void markConversationRead(menuConv)}>✅ Marquer comme lu</button>
+                  <button className="w-full py-2.5 rounded-xl border border-envle-border bg-foreground/[0.04] text-sm cursor-pointer font-body text-left px-4" onClick={() => setRenaming({ id: menuConv.id, name: menuConv.name })}>✏️ Renommer</button>
+                  <button className="w-full py-2.5 rounded-xl border border-envle-border bg-foreground/[0.04] text-sm cursor-pointer font-body text-left px-4" onClick={() => void leaveConversation(menuConv)}>👋 Quitter</button>
+                  <button className="w-full py-2.5 rounded-xl border border-destructive/40 bg-destructive/10 text-destructive text-sm cursor-pointer font-body text-left px-4" onClick={() => void deleteConversation(menuConv)}>🗑️ Supprimer</button>
+                </>
+              )}
+              <button className="w-full py-2.5 rounded-xl border border-envle-border bg-transparent text-sm text-envle-text-muted cursor-pointer font-body" onClick={() => { setMenuConv(null); setRenaming(null); }}>Annuler</button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <ContactDiscoveryModal open={contactsOpen} onClose={() => setContactsOpen(false)} onSelectConversation={onSelectConv} />
     </div>
   );
