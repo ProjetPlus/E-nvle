@@ -51,6 +51,9 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
   const [contactsOpen, setContactsOpen] = useState(false);
   const { user } = useAuth();
 
+  const [menuConv, setMenuConv] = useState<Conversation | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+
   useEffect(() => {
     if (!user) { setConversations([]); setLoading(false); return; }
     fetchConversations();
@@ -58,6 +61,7 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
       .channel("conversations-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => fetchConversations())
       .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => fetchConversations())
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversation_members" }, () => fetchConversations())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
@@ -162,8 +166,49 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
     });
   };
 
+  const renameConversation = async () => {
+    if (!renaming) return;
+    const { error } = await supabase.from("conversations").update({ name: renaming.name.trim() || "Conversation" }).eq("id", renaming.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("✅ Conversation renommée");
+    setRenaming(null);
+    setMenuConv(null);
+    fetchConversations();
+  };
+
+  const markConversationRead = async (conv: Conversation) => {
+    if (!user) return;
+    await supabase.from("messages").update({ is_read: true }).eq("conversation_id", conv.id).neq("sender_id", user.id);
+    await supabase.from("conversation_members").update({ last_read_at: new Date().toISOString() }).eq("conversation_id", conv.id).eq("user_id", user.id);
+    setMenuConv(null);
+    fetchConversations();
+  };
+
+  const deleteConversation = async (conv: Conversation) => {
+    if (!user) return;
+    if (!window.confirm(`Supprimer définitivement « ${conv.name} » ?`)) return;
+    await supabase.from("messages").delete().eq("conversation_id", conv.id);
+    await supabase.from("conversation_members").delete().eq("conversation_id", conv.id);
+    const { error } = await supabase.from("conversations").delete().eq("id", conv.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("🗑️ Conversation supprimée");
+    setMenuConv(null);
+    if (activeConvId === conv.id) onSelectConv({ id: "", name: "", lastMsg: "", time: "", avatar: "💬", avatarStyle: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))", status: "" });
+    fetchConversations();
+  };
+
+  const leaveConversation = async (conv: Conversation) => {
+    if (!user) return;
+    const { error } = await supabase.from("conversation_members").delete().eq("conversation_id", conv.id).eq("user_id", user.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("👋 Vous avez quitté la conversation");
+    setMenuConv(null);
+    if (activeConvId === conv.id) onSelectConv({ id: "", name: "", lastMsg: "", time: "", avatar: "💬", avatarStyle: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-vert)))", status: "" });
+    fetchConversations();
+  };
 
   const filtered = conversations.filter((c) => {
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       if (!c.name.toLowerCase().includes(q) && !c.lastMsg.toLowerCase().includes(q)) return false;
@@ -258,10 +303,11 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
               variants={staggerItem}
               whileTap={{ scale: 0.97 }}
               whileHover={{ x: 4, backgroundColor: "hsla(142, 47%, 33%, 0.04)" }}
-              className={`flex items-center gap-3 p-2.5 md:p-3 rounded-[14px] cursor-pointer transition-colors ${
+              className={`group flex items-center gap-3 p-2.5 md:p-3 rounded-[14px] cursor-pointer transition-colors ${
                 activeConvId === conv.id ? "bg-primary/[0.12]" : ""
               }`}
               onClick={() => onSelectConv(conv)}
+              onContextMenu={(e) => { e.preventDefault(); setMenuConv(conv); }}
             >
               <motion.div
                 whileHover={{ scale: 1.08 }}
@@ -287,6 +333,13 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
                   </motion.span>
                 )}
               </div>
+              <button
+                className="w-7 h-7 shrink-0 rounded-lg border-none bg-transparent text-envle-text-muted cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                title="Options"
+                onClick={(e) => { e.stopPropagation(); setMenuConv(conv); }}
+              >
+                ⋮
+              </button>
             </motion.div>
           ))
         )}
@@ -340,6 +393,45 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Conversation options */}
+      <AnimatePresence>
+        {menuConv && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setMenuConv(null); setRenaming(null); }}>
+            <motion.div
+              initial={{ scale: 0.9, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 30 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-envle-card border border-envle-border rounded-3xl w-full max-w-[360px] p-5 flex flex-col gap-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="font-display text-lg font-bold mb-2 truncate">{menuConv.name}</h3>
+              {renaming ? (
+                <>
+                  <input
+                    autoFocus
+                    className="w-full bg-foreground/[0.06] border border-envle-border rounded-xl px-4 py-3 text-foreground font-body text-sm outline-none focus:border-primary"
+                    value={renaming.name}
+                    onChange={(e) => setRenaming({ ...renaming, name: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === "Enter") void renameConversation(); }}
+                  />
+                  <button className="w-full py-2.5 rounded-xl border-none bg-primary text-sm font-semibold text-primary-foreground cursor-pointer font-body" onClick={() => void renameConversation()}>💾 Enregistrer</button>
+                </>
+              ) : (
+                <>
+                  <button className="w-full py-2.5 rounded-xl border border-envle-border bg-foreground/[0.04] text-sm cursor-pointer font-body text-left px-4" onClick={() => void markConversationRead(menuConv)}>✅ Marquer comme lu</button>
+                  <button className="w-full py-2.5 rounded-xl border border-envle-border bg-foreground/[0.04] text-sm cursor-pointer font-body text-left px-4" onClick={() => setRenaming({ id: menuConv.id, name: menuConv.name })}>✏️ Renommer</button>
+                  <button className="w-full py-2.5 rounded-xl border border-envle-border bg-foreground/[0.04] text-sm cursor-pointer font-body text-left px-4" onClick={() => void leaveConversation(menuConv)}>👋 Quitter</button>
+                  <button className="w-full py-2.5 rounded-xl border border-destructive/40 bg-destructive/10 text-destructive text-sm cursor-pointer font-body text-left px-4" onClick={() => void deleteConversation(menuConv)}>🗑️ Supprimer</button>
+                </>
+              )}
+              <button className="w-full py-2.5 rounded-xl border border-envle-border bg-transparent text-sm text-envle-text-muted cursor-pointer font-body" onClick={() => { setMenuConv(null); setRenaming(null); }}>Annuler</button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <ContactDiscoveryModal open={contactsOpen} onClose={() => setContactsOpen(false)} onSelectConversation={onSelectConv} />
     </div>
   );
