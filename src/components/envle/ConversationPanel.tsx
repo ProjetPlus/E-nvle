@@ -333,6 +333,13 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
                   </motion.span>
                 )}
               </div>
+              <button
+                className="w-7 h-7 shrink-0 rounded-lg border-none bg-transparent text-envle-text-muted cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                title="Options"
+                onClick={(e) => { e.stopPropagation(); setMenuConv(conv); }}
+              >
+                ⋮
+              </button>
             </motion.div>
           ))
         )}
