@@ -303,10 +303,11 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
               variants={staggerItem}
               whileTap={{ scale: 0.97 }}
               whileHover={{ x: 4, backgroundColor: "hsla(142, 47%, 33%, 0.04)" }}
-              className={`flex items-center gap-3 p-2.5 md:p-3 rounded-[14px] cursor-pointer transition-colors ${
+              className={`group flex items-center gap-3 p-2.5 md:p-3 rounded-[14px] cursor-pointer transition-colors ${
                 activeConvId === conv.id ? "bg-primary/[0.12]" : ""
               }`}
               onClick={() => onSelectConv(conv)}
+              onContextMenu={(e) => { e.preventDefault(); setMenuConv(conv); }}
             >
               <motion.div
                 whileHover={{ scale: 1.08 }}
