@@ -1,15 +1,20 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   type: "business" | "job" | "product";
+  onCreated?: () => void;
 }
 
-const CreateBusinessModal = ({ open, onClose, type }: Props) => {
+const CreateBusinessModal = ({ open, onClose, type, onCreated }: Props) => {
   const [formData, setFormData] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
 
   const configs = {
     business: {
@@ -51,12 +56,23 @@ const CreateBusinessModal = ({ open, onClose, type }: Props) => {
 
   const config = configs[type];
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const required = config.fields.slice(0, 2);
     const missing = required.filter((f) => !formData[f.key]?.trim());
     if (missing.length > 0) { toast.error("Remplissez les champs obligatoires"); return; }
+    if (!user) return toast.error("Session requise");
+    setSaving(true);
+    const operation = type === "product"
+      ? supabase.from("products").insert({ seller_id: user.id, name: formData.name.trim(), description: formData.description || null, price: Number(formData.price), currency: "XOF", category: formData.category || null, stock: Number(formData.stock || 0), images: [], is_active: true })
+      : type === "job"
+        ? supabase.from("jobs").insert({ posted_by: user.id, title: formData.title.trim(), company: formData.company || null, description: formData.description || null, location: formData.location || null, salary_range: formData.salary || null, job_type: ({ CDI: "full-time", CDD: "part-time", Freelance: "freelance", Stage: "internship" } as Record<string, string>)[formData.type] || "full-time", is_active: true })
+        : supabase.from("business_pages").insert({ owner_id: user.id, name: formData.name.trim(), category: formData.type || null, location: formData.location || null, description: formData.description || null, phone: formData.phone || null, email: formData.email || null, is_active: true });
+    const { error } = await operation;
+    setSaving(false);
+    if (error) return toast.error(error.message);
     toast.success(`✅ ${config.title} — publié avec succès!`);
     setFormData({});
+    onCreated?.();
     onClose();
   };
 
@@ -91,7 +107,7 @@ const CreateBusinessModal = ({ open, onClose, type }: Props) => {
               <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} whileTap={{ scale: 0.97 }} whileHover={{ y: -1 }} className="text-sm text-envle-text-muted border border-dashed border-envle-border rounded-xl py-3 cursor-pointer font-body bg-transparent hover:border-primary/40 transition-all" onClick={() => toast("📷 Ajouter des photos")}>📷 Ajouter des photos</motion.button>
             </div>
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="p-6 border-t border-envle-border flex gap-2">
-              <motion.button whileTap={{ scale: 0.95 }} whileHover={{ y: -1 }} className="flex-1 py-3 rounded-xl border-none text-sm font-semibold cursor-pointer text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={handleSubmit}>Publier ✨</motion.button>
+              <motion.button disabled={saving} whileTap={{ scale: 0.95 }} whileHover={{ y: -1 }} className="flex-1 py-3 rounded-xl border-none text-sm font-semibold cursor-pointer text-primary-foreground disabled:opacity-50" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={handleSubmit}>{saving ? "Publication..." : "Publier ✨"}</motion.button>
               <motion.button whileTap={{ scale: 0.95 }} className="px-6 py-3 rounded-xl border border-envle-border bg-transparent text-sm text-envle-text-muted cursor-pointer font-body" onClick={onClose}>Annuler</motion.button>
             </motion.div>
           </motion.div>

@@ -46,6 +46,7 @@ const WalletModule = ({ onBack }: { onBack: () => void }) => {
   const [showCurrencies, setShowCurrencies] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [balance, setBalance] = useState(0);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -56,7 +57,11 @@ const WalletModule = ({ onBack }: { onBack: () => void }) => {
   const fetchTransactions = async () => {
     if (!user) return;
     setLoading(true);
-    const { data } = await supabase.from("wallet_transactions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20);
+    const [{ data }, { data: walletBalance }] = await Promise.all([
+      supabase.from("wallet_transactions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
+      supabase.rpc("wallet_balance", { p_user: user.id, p_currency: selectedCurrency }),
+    ]);
+    setBalance(Number(walletBalance || 0));
     if (data) {
       setTransactions(data.map(tx => ({
         id: tx.id, type: tx.type || "credit", name: tx.description || "Transaction",
@@ -70,10 +75,13 @@ const WalletModule = ({ onBack }: { onBack: () => void }) => {
 
   const handleSend = async () => {
     if (!sendAmount || !sendTo || !user) return toast.error("Remplissez tous les champs");
-    await supabase.from("wallet_transactions").insert({
-      user_id: user.id, amount: -Number(sendAmount), currency: selectedCurrency,
-      type: "debit", description: `Envoi à ${sendTo}`, status: "completed",
-    });
+    const recipientQuery = sendTo.includes("@")
+      ? supabase.from("profiles").select("id, full_name").eq("email", sendTo.trim()).maybeSingle()
+      : supabase.from("profiles").select("id, full_name").or(`phone.eq.${sendTo.trim()},searchable_phone.eq.${sendTo.replace(/[^+0-9]/g, "")}`).maybeSingle();
+    const { data: recipient, error: recipientError } = await recipientQuery;
+    if (recipientError || !recipient) return toast.error("Destinataire E'nvlé introuvable");
+    const { error } = await supabase.rpc("transfer_wallet", { p_recipient: recipient.id, p_amount: Number(sendAmount), p_currency: selectedCurrency, p_note: `Transfert à ${recipient.full_name}` });
+    if (error) return toast.error(error.message.includes("Insufficient") ? "Solde insuffisant" : error.message);
     toast.success(`📤 ${sendAmount} ${selectedCurrency} envoyé à ${sendTo}`);
     setShowSend(false); setSendAmount(""); setSendTo("");
     fetchTransactions();
@@ -100,7 +108,7 @@ const WalletModule = ({ onBack }: { onBack: () => void }) => {
         >
           <div className="relative z-10">
             <div className="text-xs opacity-80 mb-1">Solde disponible</div>
-            <div className="text-3xl md:text-4xl font-bold font-display mb-1">0</div>
+             <div className="text-3xl md:text-4xl font-bold font-display mb-1">{formatAmount(balance)}</div>
             <div className="text-xs opacity-70 mb-4">{currencyInfo.code} · {currencyInfo.name}</div>
             <div className="flex items-center gap-2 text-xs">
               <span className="bg-white/20 px-2 py-1 rounded-lg">📱 Mobile Money</span>
@@ -159,7 +167,7 @@ const WalletModule = ({ onBack }: { onBack: () => void }) => {
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="mx-4 md:mx-6 mb-4 overflow-hidden">
               <div className="bg-envle-card border border-envle-border rounded-2xl p-4">
                 <h3 className="text-sm font-bold mb-3">Envoyer de l'argent</h3>
-                <input className="w-full bg-foreground/[0.06] border border-envle-border rounded-xl px-4 py-2.5 text-foreground font-body text-sm mb-2 outline-none focus:border-primary placeholder:text-envle-text-muted" placeholder="Destinataire" value={sendTo} onChange={(e) => setSendTo(e.target.value)} />
+                <input className="w-full bg-foreground/[0.06] border border-envle-border rounded-xl px-4 py-2.5 text-foreground font-body text-sm mb-2 outline-none focus:border-primary placeholder:text-envle-text-muted" placeholder="Téléphone ou e-mail E'nvlé" value={sendTo} onChange={(e) => setSendTo(e.target.value)} />
                 <input className="w-full bg-foreground/[0.06] border border-envle-border rounded-xl px-4 py-2.5 text-foreground font-body text-sm mb-3 outline-none focus:border-primary placeholder:text-envle-text-muted" placeholder={`Montant (${selectedCurrency})`} type="number" value={sendAmount} onChange={(e) => setSendAmount(e.target.value)} />
                 <div className="flex gap-2">
                   <motion.button whileTap={{ scale: 0.95 }} className="flex-1 py-2.5 rounded-xl border-none text-sm font-semibold cursor-pointer text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={handleSend}>Envoyer ➤</motion.button>

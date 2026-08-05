@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { toast } from "sonner";
 import type { Conversation } from "./ConversationPanel";
 
 const stagger = {
@@ -10,7 +9,7 @@ const fadeUp = {
   animate: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } },
 };
 
-const RightPanel = ({ conv, onOpenCall }: { conv: Conversation; onOpenCall: (type: string) => void }) => {
+const RightPanel = ({ conv, onOpenCall, onNavigate }: { conv: Conversation; onOpenCall: (type: string) => void; onNavigate: (destination: "map" | "wallet") => void }) => {
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -26,8 +25,8 @@ const RightPanel = ({ conv, onOpenCall }: { conv: Conversation; onOpenCall: (typ
         <h4 className="text-xs font-bold text-envle-text-muted uppercase tracking-wider mb-2">Actions rapides</h4>
         {[
           { icon: "📹", label: "Appel vidéo", onClick: () => onOpenCall("video") },
-          { icon: "📍", label: "Voir sur la carte", onClick: () => toast("📍 Carte") },
-          { icon: "💸", label: "Envoyer de l'argent", onClick: () => toast("💸 Portefeuille") },
+          { icon: "📍", label: "Voir sur la carte", onClick: () => onNavigate("map") },
+          { icon: "💸", label: "Envoyer de l'argent", onClick: () => onNavigate("wallet") },
         ].map((action, i) => (
           <motion.button
             key={action.label}

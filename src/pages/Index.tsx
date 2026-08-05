@@ -209,7 +209,7 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
               <div className={`flex-1 flex ${isMobile && mobileView === "list" ? "hidden" : ""}`}>
                 <ChatArea conv={activeConv} onOpenCall={openCall} onOpenStories={() => setActiveNav("stories")} onOpenNotifications={() => setNotificationsOpen(true)} onBack={isMobile ? () => setMobileView("list") : undefined} />
               </div>
-              {!isMobile && <RightPanel conv={activeConv} onOpenCall={openCall} />}
+              {!isMobile && <RightPanel conv={activeConv} onOpenCall={openCall} onNavigate={setActiveNav} />}
             </>
           )}
         </motion.div>
@@ -249,7 +249,7 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
       <AuthModal open={!authLoading && (authOpen || authOnly) && !user} locked onClose={() => setAuthOpen(false)} />
       <CallModal open={callOpen && profile?.profile_completed === true} type={callType} convName={callPeer?.name || activeConv.name} convAvatar={callPeer?.avatar || activeConv.avatar} convAvatarStyle={callPeer?.avatarStyle || activeConv.avatarStyle} callId={currentCallId} direction={callDirection} remoteUserId={callDirection === "incoming" ? callPeer?.contactId : activeConv.contactId} onClose={() => setCallOpen(false)} />
       <NotificationCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} notifications={notifications} onMarkAllRead={markAllRead} onClearAll={clearNotifications} />
-      <CreateBusinessModal open={createModal.open} type={createModal.type} onClose={() => setCreateModal({ ...createModal, open: false })} />
+      <CreateBusinessModal open={createModal.open} type={createModal.type} onClose={() => setCreateModal({ ...createModal, open: false })} onCreated={() => setActiveNav(createModal.type === "product" ? "shop" : "jobs")} />
     </div>
   );
 };
