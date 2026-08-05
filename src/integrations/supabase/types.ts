@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      business_pages: {
+        Row: {
+          category: string | null
+          cover_url: string | null
+          created_at: string
+          description: string | null
+          email: string | null
+          id: string
+          is_active: boolean
+          location: string | null
+          logo_url: string | null
+          name: string
+          owner_id: string
+          phone: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          category?: string | null
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          logo_url?: string | null
+          name: string
+          owner_id: string
+          phone?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          category?: string | null
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          logo_url?: string | null
+          name?: string
+          owner_id?: string
+          phone?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_pages_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_signals: {
         Row: {
           call_id: string
@@ -132,6 +191,13 @@ export type Database = {
           stun_turn_config?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "calls_caller_profile_fkey"
+            columns: ["caller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "calls_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -697,7 +763,15 @@ export type Database = {
           updated_at?: string | null
           views?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_seller_profile_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -930,6 +1004,13 @@ export type Database = {
             referencedRelation: "stories"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "stories_user_profile_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       story_views: {
@@ -1067,7 +1148,20 @@ export type Database = {
         Args: { _conv: string; _user: string }
         Returns: boolean
       }
+      transfer_wallet: {
+        Args: {
+          p_amount: number
+          p_currency?: string
+          p_note?: string
+          p_recipient: string
+        }
+        Returns: string
+      }
       verify_otp: { Args: { p_code: string; p_email: string }; Returns: Json }
+      wallet_balance: {
+        Args: { p_currency?: string; p_user: string }
+        Returns: number
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
