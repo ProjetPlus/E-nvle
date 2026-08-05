@@ -143,10 +143,9 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
       const { data: conv, error } = await supabase.from("conversations").insert({ name: "Conversation", created_by: user.id, is_group: false }).select().single();
       if (error || !conv) { toast.error("❌ Erreur de création"); return; }
       conversationId = conv.id;
-      const { error: memberError } = await supabase.from("conversation_members").insert([
-        { conversation_id: conv.id, user_id: user.id, role: "admin" },
-        { conversation_id: conv.id, user_id: contactId, role: "member" },
-      ] as any);
+      const { error: selfMemberError } = await supabase.from("conversation_members").insert({ conversation_id: conv.id, user_id: user.id, role: "admin" } as any);
+      if (selfMemberError) { toast.error(selfMemberError.message); return; }
+      const { error: memberError } = await supabase.from("conversation_members").insert({ conversation_id: conv.id, user_id: contactId, role: "member" } as any);
       if (memberError) { toast.error(memberError.message); return; }
       convName = conv.name;
     }
