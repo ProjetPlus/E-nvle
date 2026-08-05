@@ -17,6 +17,7 @@ interface Job {
   posted: string;
   isSaved: boolean;
 }
+interface BusinessPage { id: string; name: string; category: string; description: string; location: string; ownerId: string; }
 
 const categories = ["Tout", "Tech", "Design", "Marketing", "Management"];
 
@@ -31,9 +32,19 @@ const JobsModule = ({ onBack, onCreateJob, onCreateBusiness }: Props) => {
   const [activeCat, setActiveCat] = useState("Tout");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pages, setPages] = useState<BusinessPage[]>([]);
   const { user } = useAuth();
 
-  useEffect(() => { fetchJobs(); }, []);
+  useEffect(() => {
+    void fetchJobs(); void fetchPages();
+    const channel = supabase.channel("jobs-pages-live").on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => void fetchJobs()).on("postgres_changes", { event: "*", schema: "public", table: "business_pages" }, () => void fetchPages()).subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, []);
+
+  const fetchPages = async () => {
+    const { data } = await supabase.from("business_pages").select("*").eq("is_active", true).order("created_at", { ascending: false });
+    setPages((data || []).map((page) => ({ id: page.id, name: page.name, category: page.category || "Entreprise", description: page.description || "", location: page.location || "", ownerId: page.owner_id })));
+  };
 
   const fetchJobs = async () => {
     setLoading(true);
@@ -134,11 +145,7 @@ const JobsModule = ({ onBack, onCreateJob, onCreateBusiness }: Props) => {
         </>
       ) : (
         <div className="flex-1 overflow-y-auto p-3 md:p-6 scrollbar-thin">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center h-40 text-center">
-            <span className="text-4xl mb-3">🏢</span>
-            <p className="text-envle-text-muted text-sm">Aucune page pro</p>
-            <p className="text-envle-text-muted text-xs mt-1">Créez votre page professionnelle</p>
-          </motion.div>
+           {pages.length === 0 ? <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center h-40 text-center"><span className="text-4xl mb-3">🏢</span><p className="text-envle-text-muted text-sm">Aucune page pro</p><p className="text-envle-text-muted text-xs mt-1">Créez votre page professionnelle</p></motion.div> : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{pages.map((page) => <div key={page.id} className="bg-envle-card border border-envle-border rounded-2xl p-4"><div className="w-12 h-12 rounded-xl bg-primary/15 grid place-items-center text-2xl mb-3">🏢</div><h3 className="font-bold">{page.name}</h3><p className="text-xs text-primary mt-1">{page.category}</p><p className="text-xs text-envle-text-muted mt-2 line-clamp-3">{page.description}</p>{page.location && <p className="text-xs text-envle-text-muted mt-3">📍 {page.location}</p>}{page.ownerId === user?.id && <button className="mt-3 text-xs text-destructive bg-transparent border-none cursor-pointer" onClick={async () => { if (confirm("Supprimer cette page ?")) await supabase.from("business_pages").delete().eq("id", page.id); }}>Supprimer</button>}</div>)}</div>}
         </div>
       )}
     </div>
