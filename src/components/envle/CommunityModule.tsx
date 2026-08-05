@@ -22,9 +22,25 @@ const CommunityModule = ({ onBack }: { onBack: () => void }) => {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [communityName, setCommunityName] = useState("");
+  const [communityDescription, setCommunityDescription] = useState("");
   const { user } = useAuth();
 
-  useEffect(() => { fetchCommunities(); }, [user]);
+  useEffect(() => {
+    void fetchCommunities();
+    const channel = supabase.channel("communities-live").on("postgres_changes", { event: "*", schema: "public", table: "communities" }, () => void fetchCommunities()).on("postgres_changes", { event: "*", schema: "public", table: "community_members" }, () => void fetchCommunities()).subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [user?.id]);
+
+  const createCommunity = async () => {
+    if (!user || !communityName.trim()) return toast.error("Nom de communauté requis");
+    const { data, error } = await supabase.from("communities").insert({ name: communityName.trim(), description: communityDescription.trim() || null, created_by: user.id, member_count: 1, is_public: true }).select().single();
+    if (error || !data) return toast.error(error?.message || "Création impossible");
+    const { error: memberError } = await supabase.from("community_members").insert({ community_id: data.id, user_id: user.id, role: "admin" });
+    if (memberError) return toast.error(memberError.message);
+    setCommunityName(""); setCommunityDescription(""); setCreating(false); toast.success("Communauté créée");
+  };
 
   const fetchCommunities = async () => {
     setLoading(true);
@@ -69,7 +85,7 @@ const CommunityModule = ({ onBack }: { onBack: () => void }) => {
           <h2 className="font-display text-xl md:text-2xl font-bold">Communautés</h2>
           <p className="text-[11px] text-envle-text-muted">{communities.filter(c => c.isJoined).length} rejointes</p>
         </div>
-        <motion.button whileTap={{ scale: 0.9 }} className="px-3 py-1.5 rounded-xl border-none font-body text-xs cursor-pointer font-semibold text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={() => toast("🌍 Créer une communauté — Bientôt disponible")}>+ Créer</motion.button>
+        <motion.button whileTap={{ scale: 0.9 }} className="px-3 py-1.5 rounded-xl border-none font-body text-xs cursor-pointer font-semibold text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={() => setCreating(true)}>+ Créer</motion.button>
       </motion.div>
 
       <div className="flex px-4 md:px-6 gap-1.5 py-2 overflow-x-auto border-b border-envle-border" style={{ scrollbarWidth: "none" }}>
@@ -131,6 +147,7 @@ const CommunityModule = ({ onBack }: { onBack: () => void }) => {
       </div>
 
       <AnimatePresence>
+        {creating && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/80 flex items-center justify-center p-4" onClick={() => setCreating(false)}><div className="w-full max-w-md bg-envle-card border border-envle-border rounded-2xl p-5" onClick={(event) => event.stopPropagation()}><h3 className="font-display text-xl font-bold mb-4">Créer une communauté</h3><input value={communityName} onChange={(e) => setCommunityName(e.target.value)} placeholder="Nom" className="w-full bg-foreground/[0.06] border border-envle-border rounded-xl px-3 py-2.5 mb-3 outline-none" /><textarea value={communityDescription} onChange={(e) => setCommunityDescription(e.target.value)} placeholder="Description" className="w-full min-h-24 bg-foreground/[0.06] border border-envle-border rounded-xl px-3 py-2.5 mb-4 outline-none resize-none" /><div className="flex gap-2"><button className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground border-none cursor-pointer font-semibold" onClick={() => void createCommunity()}>Créer</button><button className="px-4 py-2.5 rounded-xl border border-envle-border bg-transparent cursor-pointer" onClick={() => setCreating(false)}>Annuler</button></div></div></motion.div>}
         {selectedCommunity && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelectedCommunity(null)}>
             <motion.div initial={{ scale: 0.85, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.85, y: 30 }} className="bg-envle-card border border-envle-border rounded-3xl w-full max-w-[440px] max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>

@@ -31,14 +31,16 @@ const BoutiqueModule = ({ onBack, onCreateProduct }: Props) => {
   const { user } = useAuth();
 
   useEffect(() => {
-    fetchProducts();
+    void fetchProducts();
+    const channel = supabase.channel("products-live").on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => void fetchProducts()).subscribe();
+    return () => { void supabase.removeChannel(channel); };
   }, []);
 
   const fetchProducts = async () => {
     setLoading(true);
     const { data } = await supabase
       .from("products")
-      .select("*, profiles:seller_id(full_name)")
+      .select("*, profiles:products_seller_profile_fkey(full_name)")
       .eq("is_active", true)
       .order("created_at", { ascending: false });
 

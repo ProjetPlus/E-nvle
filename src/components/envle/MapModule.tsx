@@ -7,6 +7,18 @@ const categories = ["Tout", "Restaurants", "Coworking", "Culture", "Marchés", "
 const MapModule = ({ onBack }: { onBack: () => void }) => {
   const [activeCat, setActiveCat] = useState("Tout");
   const [showFriends, setShowFriends] = useState(false);
+  const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+
+  const locate = () => {
+    if (!navigator.geolocation) return toast.error("Géolocalisation non prise en charge");
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => { setPosition({ lat: coords.latitude, lng: coords.longitude }); setLocating(false); toast.success("Position détectée"); },
+      () => { setLocating(false); toast.error("Autorisez la localisation dans le navigateur"); },
+      { enableHighAccuracy: true, timeout: 12000 },
+    );
+  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
@@ -22,12 +34,15 @@ const MapModule = ({ onBack }: { onBack: () => void }) => {
         </motion.button>
       </motion.div>
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-[180px] md:h-[200px] relative overflow-hidden" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-fond)))" }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-[260px] md:h-[360px] relative overflow-hidden" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert-dark)), hsl(var(--envle-fond)))" }}>
+        {position && <iframe title="Carte de votre position" className="absolute inset-0 w-full h-full border-0" src={`https://www.openstreetmap.org/export/embed.html?bbox=${position.lng - 0.02}%2C${position.lat - 0.02}%2C${position.lng + 0.02}%2C${position.lat + 0.02}&layer=mapnik&marker=${position.lat}%2C${position.lng}`} />}
+        {!position && (
         <div className="absolute inset-0 flex items-center justify-center flex-col gap-2">
           <motion.span animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity }} className="text-5xl">🗺️</motion.span>
           <span className="text-xs text-envle-text-muted">Carte interactive</span>
-          <motion.span animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 2, repeat: Infinity }} className="text-[11px] text-envle-vert-light">📍 Position actuelle</motion.span>
+          <button className="px-4 py-2 rounded-xl bg-primary text-primary-foreground border-none cursor-pointer font-semibold text-xs" onClick={locate} disabled={locating}>{locating ? "Localisation..." : "📍 Utiliser ma position"}</button>
         </div>
+        )}
       </motion.div>
 
       <div className="flex px-4 md:px-6 gap-1.5 py-2 overflow-x-auto border-b border-envle-border" style={{ scrollbarWidth: "none" }}>
@@ -39,8 +54,8 @@ const MapModule = ({ onBack }: { onBack: () => void }) => {
       <div className="flex-1 overflow-y-auto scrollbar-thin">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center h-40 text-center">
           <span className="text-4xl mb-3">📍</span>
-          <p className="text-envle-text-muted text-sm">Activez la géolocalisation</p>
-          <p className="text-envle-text-muted text-xs mt-1">pour découvrir les lieux à proximité</p>
+           <p className="text-envle-text-muted text-sm">{position ? `Position: ${position.lat.toFixed(5)}, ${position.lng.toFixed(5)}` : "Activez la géolocalisation"}</p>
+           <button className="mt-3 px-4 py-2 rounded-xl border border-envle-border bg-envle-card cursor-pointer text-xs font-semibold" onClick={locate}>{position ? "Actualiser ma position" : "Me localiser"}</button>
         </motion.div>
       </div>
     </div>

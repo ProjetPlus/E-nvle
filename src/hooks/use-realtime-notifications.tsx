@@ -19,6 +19,11 @@ export const useRealtimeNotifications = (userId: string | undefined, addNotifica
   useEffect(() => {
     if (!userId) return;
     const sound = localStorage.getItem("envle-notification-sound") || "default";
+    const loadNotifications = async () => {
+      const { data } = await supabase.from("notifications").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(50);
+      (data || []).reverse().forEach((n) => addNotification({ id: n.id, type: (n.type as Notification["type"]) || "system", title: n.title, body: n.body || "", time: n.created_at ? new Date(n.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : timeNow(), read: !!n.is_read, icon: n.icon || "🔔" }));
+    };
+    void loadNotifications();
     const channel = supabase
       .channel(`envle-realtime-${userId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` }, (payload) => {
@@ -35,14 +40,6 @@ export const useRealtimeNotifications = (userId: string | undefined, addNotifica
         addNotification(notification);
         playNotificationSound(sound);
         showBrowserNotification(notification.title, notification.body);
-      })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-        const message = payload.new as { id: string; sender_id?: string; content?: string; message_type?: string };
-        if (message.sender_id === userId) return;
-        const body = message.message_type === "audio" ? "Message vocal" : message.message_type === "image" ? "Image reçue" : message.content || "Nouveau message";
-        addNotification({ id: `message-${message.id}`, type: "message", title: "Nouveau message", body, time: timeNow(), read: false, icon: "💬" });
-        playNotificationSound(sound);
-        showBrowserNotification("Nouveau message", body);
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "calls", filter: `callee_id=eq.${userId}` }, (payload) => {
         const call = payload.new as { id: string; call_type?: string; status?: string };

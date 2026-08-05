@@ -121,8 +121,9 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
     const bucket = "chat-files";
     const { error } = await supabase.storage.from(bucket).upload(path, file, { cacheControl: "3600", upsert: false });
     if (error) { toast.error(`❌ Erreur upload: ${error.message}`); return null; }
-    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
-    return { url: urlData.publicUrl, name: file.name, size: file.size };
+    const { data: signedData, error: signedError } = await supabase.storage.from(bucket).createSignedUrl(path, 60 * 60 * 24 * 7);
+    if (signedError || !signedData?.signedUrl) { toast.error("Lien du fichier indisponible"); return null; }
+    return { url: signedData.signedUrl, name: file.name, size: file.size };
   }, [user]);
 
   const sendMessage = useCallback(async () => {
@@ -186,9 +187,13 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
       toast.error(data?.error || error?.message || "IA indisponible");
       return;
     }
-    setInput(data.text || "");
-    if (automatic) toast.success("🤖 Réponse automatique préparée");
-  }, [aiModel, input]);
+    const generatedText = data.text || "";
+    if (automatic && generatedText && user && conv.id) {
+      const expiresAt = ephemeralTtl > 0 ? new Date(Date.now() + ephemeralTtl * 1000).toISOString() : null;
+      const { error: insertError } = await supabase.from("messages").insert({ conversation_id: conv.id, sender_id: user.id, content: generatedText, message_type: "text", expires_at: expiresAt });
+      if (insertError) toast.error(insertError.message); else toast.success("🤖 Réponse automatique envoyée");
+    } else setInput(generatedText);
+  }, [aiModel, input, user, conv.id, ephemeralTtl]);
 
   const toggleAutoReply = () => {
     const next = !autoReply;

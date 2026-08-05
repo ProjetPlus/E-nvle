@@ -206,8 +206,8 @@ const StoriesModule = ({ onBack }: { onBack: () => void }) => {
                 >
                   <div className="aspect-[3/4] relative overflow-hidden">
                     {story.userId === user?.id && <div className="absolute z-20 top-2 left-2 flex gap-1"><button title="Modifier" className="w-8 h-8 rounded-full bg-background/80 border-none cursor-pointer" onClick={(event) => { event.stopPropagation(); void editStory(story); }}>✏️</button><button title="Supprimer" className="w-8 h-8 rounded-full bg-destructive/80 border-none cursor-pointer" onClick={(event) => { event.stopPropagation(); void deleteStory(story); }}>🗑️</button></div>}
-                    {story.mediaUrl ? (
-                      <img src={story.mediaUrl} alt={story.caption} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                     {story.mediaUrl ? (
+                       story.type === "video" || story.type === "reel" ? <video src={story.mediaUrl} muted playsInline preload="metadata" className="w-full h-full object-cover" /> : <img src={story.mediaUrl} alt={story.caption || "Story"} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     ) : (
                       <motion.div
                         className="w-full h-full flex items-center justify-center text-4xl transition-transform duration-700"
@@ -267,8 +267,8 @@ const StoriesModule = ({ onBack }: { onBack: () => void }) => {
               style={{ background: viewingStory.avatarStyle }}
               onClick={(e) => e.stopPropagation()}
             >
-              {viewingStory.mediaUrl && (
-                <img src={viewingStory.mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+               {viewingStory.mediaUrl && (
+                 viewingStory.type === "video" || viewingStory.type === "reel" ? <video src={viewingStory.mediaUrl} autoPlay controls playsInline className="absolute inset-0 w-full h-full object-cover" /> : <img src={viewingStory.mediaUrl} alt={viewingStory.caption || "Story"} className="absolute inset-0 w-full h-full object-cover" />
               )}
               <div className="absolute top-3 left-3 right-3 h-1 bg-white/20 rounded-full overflow-hidden z-10">
                 <motion.div className="h-full bg-white rounded-full" initial={{ width: "0%" }} animate={{ width: "100%" }} transition={{ duration: 5, ease: "linear" }} onAnimationComplete={() => setViewingStory(null)} />
