@@ -110,26 +110,54 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
     return peer;
   }, [callId, sendSignal]);
 
+  const flushCandidates = useCallback(async () => {
+    const peer = peerRef.current;
+    if (!peer || !peer.remoteDescription) return;
+    const pending = pendingCandidatesRef.current;
+    pendingCandidatesRef.current = [];
+    for (const candidate of pending) {
+      try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch { /* ignore */ }
+    }
+  }, []);
+
+  const answerOffer = useCallback(async (offer: any) => {
+    const stream = await startLocalMedia(type === "video");
+    const peer = await createPeer(stream);
+    await peer.setRemoteDescription(new RTCSessionDescription(offer));
+    await flushCandidates();
+    const answer = await peer.createAnswer();
+    await peer.setLocalDescription(answer);
+    await sendSignal("answer", safeRtcDescription(answer));
+    setCallStatus("Connexion média...");
+  }, [createPeer, flushCandidates, sendSignal, startLocalMedia, type]);
+
   const processSignal = useCallback(async (signal: any) => {
     if (!signal?.id || processedSignals.current.has(signal.id) || signal.sender_id === user?.id) return;
     processedSignals.current.add(signal.id);
     if (signal.signal_type === "offer") {
-      const stream = await startLocalMedia(type === "video");
-      const peer = await createPeer(stream);
-      await peer.setRemoteDescription(new RTCSessionDescription(signal.payload));
-      const answer = await peer.createAnswer();
-      await peer.setLocalDescription(answer);
-      await sendSignal("answer", safeRtcDescription(answer));
-      setCallStatus("Connexion média...");
+      // Le destinataire ne répond qu'après avoir décroché
+      if (direction === "incoming" && !acceptedRef.current) {
+        pendingOfferRef.current = signal.payload;
+        return;
+      }
+      await answerOffer(signal.payload);
     }
     if (signal.signal_type === "answer" && peerRef.current) {
       await peerRef.current.setRemoteDescription(new RTCSessionDescription(signal.payload));
+      await flushCandidates();
       setCallStatus("Connexion média...");
     }
-    if (signal.signal_type === "candidate" && peerRef.current) {
-      try { await peerRef.current.addIceCandidate(new RTCIceCandidate(signal.payload)); } catch { /* candidate can arrive before SDP */ }
+    if (signal.signal_type === "candidate") {
+      const peer = peerRef.current;
+      if (!peer || !peer.remoteDescription) { pendingCandidatesRef.current.push(signal.payload); return; }
+      try { await peer.addIceCandidate(new RTCIceCandidate(signal.payload)); } catch { /* ignore */ }
     }
-  }, [createPeer, sendSignal, startLocalMedia, type, user?.id]);
+    if (signal.signal_type === "hangup") {
+      ringtoneStopRef.current?.();
+      setCallStatus("Terminé");
+    }
+  }, [answerOffer, direction, flushCandidates, user?.id]);
+
 
   const startOutgoingWebRtc = useCallback(async () => {
     if (!callId || !remoteUserId || !user?.id) return;
