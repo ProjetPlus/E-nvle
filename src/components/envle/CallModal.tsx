@@ -276,18 +276,25 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
 
   const acceptCall = async () => {
     ringtoneStopRef.current?.();
+    acceptedRef.current = true;
     setCallStatus("Connexion média...");
     try {
-      const stream = await startLocalMedia(type === "video");
-      await createPeer(stream);
       if (callId) await supabase.from("calls").update({ status: "active", answered_at: new Date().toISOString(), ring_state: "answered", callee_presence: "answered", media_ready: true } as any).eq("id", callId);
+      if (pendingOfferRef.current) {
+        const offer = pendingOfferRef.current;
+        pendingOfferRef.current = null;
+        await answerOffer(offer);
+      }
       const { data } = callId ? await supabase.from("call_signals").select("*").eq("call_id", callId).order("created_at", { ascending: true }) : { data: [] };
       for (const signal of data || []) await processSignal(signal);
-    } catch {
+      if (!peerRef.current && pendingOfferRef.current) await answerOffer(pendingOfferRef.current);
+    } catch (error) {
+      console.error("acceptCall", error);
       toast.error("Caméra ou micro indisponible");
       setCallStatus("Injoignable");
     }
   };
+
 
   const markRemoteUnavailable = async () => {
     setCallStatus("Injoignable");
