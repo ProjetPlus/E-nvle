@@ -45,6 +45,8 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
   const acceptedRef = useRef(false);
   const pendingOfferRef = useRef<any>(null);
   const pendingCandidatesRef = useRef<any[]>([]);
+  const remoteConnectedRef = useRef(false);
+
 
 
   const sendSignal = useCallback(async (signalType: string, payload: unknown) => {
