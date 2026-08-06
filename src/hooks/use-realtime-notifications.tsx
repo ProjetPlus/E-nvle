@@ -58,5 +58,5 @@ export const useRealtimeNotifications = (userId: string | undefined, addNotifica
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [addNotification, userId]);
+  }, [userId]);
 };
