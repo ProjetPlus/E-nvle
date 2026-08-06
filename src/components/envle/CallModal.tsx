@@ -42,6 +42,10 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
   const ringtoneStopRef = useRef<(() => void) | null>(null);
   const processedSignals = useRef<Set<string>>(new Set());
   const setupKeyRef = useRef<string>("");
+  const acceptedRef = useRef(false);
+  const pendingOfferRef = useRef<any>(null);
+  const pendingCandidatesRef = useRef<any[]>([]);
+
 
   const sendSignal = useCallback(async (signalType: string, payload: unknown) => {
     if (!callId || !user?.id || !remoteUserId) return;
