@@ -181,7 +181,11 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
     if (!open) {
       setCallDuration(0);
       setRemoteConnected(false);
+      remoteConnectedRef.current = false;
       processedSignals.current.clear();
+      pendingCandidatesRef.current = [];
+      pendingOfferRef.current = null;
+      acceptedRef.current = false;
       setupKeyRef.current = "";
       ringtoneStopRef.current?.();
       ringtoneStopRef.current = null;
@@ -198,18 +202,19 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
       void startOutgoingWebRtc();
     }
     const timeout = window.setTimeout(() => {
-      if (direction === "outgoing" && !remoteConnected) {
+      if (direction === "outgoing" && !remoteConnectedRef.current) {
         setCallStatus("Injoignable");
         ringtoneStopRef.current?.();
         if (callId) void supabase.from("calls").update({ status: "missed", ring_state: "unavailable", ended_at: new Date().toISOString() } as any).eq("id", callId);
       }
-    }, 30_000);
+    }, 45_000);
     return () => {
       window.clearInterval(interval);
       window.clearTimeout(timeout);
       ringtoneStopRef.current?.();
     };
-  }, [callId, direction, open, remoteConnected, startOutgoingWebRtc, stopMedia, type]);
+  }, [callId, direction, open, startOutgoingWebRtc, stopMedia, type]);
+
 
   useEffect(() => {
     if (!open || !callId) return;
