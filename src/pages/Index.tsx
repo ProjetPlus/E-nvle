@@ -23,6 +23,8 @@ import CreateBusinessModal from "@/components/envle/CreateBusinessModal";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/use-auth";
 import { useRealtimeNotifications } from "@/hooks/use-realtime-notifications";
+import { useIncomingCalls } from "@/hooks/use-incoming-calls";
+
 import { supabase } from "@/integrations/supabase/client";
 import { playLoopingSound } from "@/lib/sounds";
 
@@ -110,33 +112,26 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
     setAuthOpen(false);
   }, [user]);
 
-  useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel(`calls-live-${user.id}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "calls", filter: `callee_id=eq.${user.id}` }, async (payload) => {
-        const call = payload.new as any;
-        if (!["ringing", "dialing"].includes(call.status || "")) return;
-        const { data: caller } = await supabase.from("profiles").select("id, full_name, phone, avatar_url, status, last_seen").eq("id", call.caller_id).maybeSingle();
-        const name = caller?.full_name || caller?.phone || "Appel entrant";
-        setCallPeer({
-          id: call.conversation_id || "",
-          name,
-          lastMsg: "",
-          time: "",
-          avatar: caller?.avatar_url ? "" : name.charAt(0).toUpperCase(),
-          avatarStyle: emptyConv.avatarStyle,
-          contactId: call.caller_id,
-          status: caller?.status === "online" ? "Connecté" : caller?.last_seen ? `Dernière connexion ${new Date(caller.last_seen).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}` : "",
-        });
-        setCurrentCallId(call.id);
-        setCallDirection("incoming");
-        setCallType(call.call_type || "audio");
-        setCallOpen(true);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user]);
+  useIncomingCalls(user?.id, async (call) => {
+    if (callOpen) return;
+    const { data: caller } = await supabase.from("profiles").select("id, full_name, phone, avatar_url, status, last_seen").eq("id", call.caller_id).maybeSingle();
+    const name = caller?.full_name || caller?.phone || "Appel entrant";
+    setCallPeer({
+      id: call.conversation_id || "",
+      name,
+      lastMsg: "",
+      time: "",
+      avatar: caller?.avatar_url ? "" : name.charAt(0).toUpperCase(),
+      avatarStyle: emptyConv.avatarStyle,
+      contactId: call.caller_id,
+      status: caller?.status === "online" ? "Connecté" : caller?.last_seen ? `Dernière connexion ${new Date(caller.last_seen).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}` : "",
+    });
+    setCurrentCallId(call.id);
+    setCallDirection("incoming");
+    setCallType(call.call_type || "audio");
+    setCallOpen(true);
+  });
+
 
   const handleSplashFinish = useCallback(() => {
     setShowSplash(false);

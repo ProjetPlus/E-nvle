@@ -42,6 +42,12 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
   const ringtoneStopRef = useRef<(() => void) | null>(null);
   const processedSignals = useRef<Set<string>>(new Set());
   const setupKeyRef = useRef<string>("");
+  const acceptedRef = useRef(false);
+  const pendingOfferRef = useRef<any>(null);
+  const pendingCandidatesRef = useRef<any[]>([]);
+  const remoteConnectedRef = useRef(false);
+
+
 
   const sendSignal = useCallback(async (signalType: string, payload: unknown) => {
     if (!callId || !user?.id || !remoteUserId) return;
@@ -91,41 +97,73 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
       const [remoteStream] = event.streams;
       remoteStreamRef.current = remoteStream;
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
+      remoteConnectedRef.current = true;
       setRemoteConnected(true);
       setCallStatus("Appel en cours");
       ringtoneStopRef.current?.();
     };
     peer.onconnectionstatechange = () => {
       if (["connected", "completed"].includes(peer.connectionState)) {
+        remoteConnectedRef.current = true;
         setRemoteConnected(true);
         setCallStatus("Appel en cours");
+        ringtoneStopRef.current?.();
       }
       if (["failed", "disconnected"].includes(peer.connectionState)) setCallStatus("Injoignable");
     };
+
     peerRef.current = peer;
     return peer;
   }, [callId, sendSignal]);
+
+  const flushCandidates = useCallback(async () => {
+    const peer = peerRef.current;
+    if (!peer || !peer.remoteDescription) return;
+    const pending = pendingCandidatesRef.current;
+    pendingCandidatesRef.current = [];
+    for (const candidate of pending) {
+      try { await peer.addIceCandidate(new RTCIceCandidate(candidate)); } catch { /* ignore */ }
+    }
+  }, []);
+
+  const answerOffer = useCallback(async (offer: any) => {
+    const stream = await startLocalMedia(type === "video");
+    const peer = await createPeer(stream);
+    await peer.setRemoteDescription(new RTCSessionDescription(offer));
+    await flushCandidates();
+    const answer = await peer.createAnswer();
+    await peer.setLocalDescription(answer);
+    await sendSignal("answer", safeRtcDescription(answer));
+    setCallStatus("Connexion média...");
+  }, [createPeer, flushCandidates, sendSignal, startLocalMedia, type]);
 
   const processSignal = useCallback(async (signal: any) => {
     if (!signal?.id || processedSignals.current.has(signal.id) || signal.sender_id === user?.id) return;
     processedSignals.current.add(signal.id);
     if (signal.signal_type === "offer") {
-      const stream = await startLocalMedia(type === "video");
-      const peer = await createPeer(stream);
-      await peer.setRemoteDescription(new RTCSessionDescription(signal.payload));
-      const answer = await peer.createAnswer();
-      await peer.setLocalDescription(answer);
-      await sendSignal("answer", safeRtcDescription(answer));
-      setCallStatus("Connexion média...");
+      // Le destinataire ne répond qu'après avoir décroché
+      if (direction === "incoming" && !acceptedRef.current) {
+        pendingOfferRef.current = signal.payload;
+        return;
+      }
+      await answerOffer(signal.payload);
     }
     if (signal.signal_type === "answer" && peerRef.current) {
       await peerRef.current.setRemoteDescription(new RTCSessionDescription(signal.payload));
+      await flushCandidates();
       setCallStatus("Connexion média...");
     }
-    if (signal.signal_type === "candidate" && peerRef.current) {
-      try { await peerRef.current.addIceCandidate(new RTCIceCandidate(signal.payload)); } catch { /* candidate can arrive before SDP */ }
+    if (signal.signal_type === "candidate") {
+      const peer = peerRef.current;
+      if (!peer || !peer.remoteDescription) { pendingCandidatesRef.current.push(signal.payload); return; }
+      try { await peer.addIceCandidate(new RTCIceCandidate(signal.payload)); } catch { /* ignore */ }
     }
-  }, [createPeer, sendSignal, startLocalMedia, type, user?.id]);
+    if (signal.signal_type === "hangup") {
+      ringtoneStopRef.current?.();
+      setCallStatus("Terminé");
+    }
+  }, [answerOffer, direction, flushCandidates, user?.id]);
+
 
   const startOutgoingWebRtc = useCallback(async () => {
     if (!callId || !remoteUserId || !user?.id) return;
@@ -149,7 +187,11 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
     if (!open) {
       setCallDuration(0);
       setRemoteConnected(false);
+      remoteConnectedRef.current = false;
       processedSignals.current.clear();
+      pendingCandidatesRef.current = [];
+      pendingOfferRef.current = null;
+      acceptedRef.current = false;
       setupKeyRef.current = "";
       ringtoneStopRef.current?.();
       ringtoneStopRef.current = null;
@@ -166,18 +208,19 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
       void startOutgoingWebRtc();
     }
     const timeout = window.setTimeout(() => {
-      if (direction === "outgoing" && !remoteConnected) {
+      if (direction === "outgoing" && !remoteConnectedRef.current) {
         setCallStatus("Injoignable");
         ringtoneStopRef.current?.();
         if (callId) void supabase.from("calls").update({ status: "missed", ring_state: "unavailable", ended_at: new Date().toISOString() } as any).eq("id", callId);
       }
-    }, 30_000);
+    }, 45_000);
     return () => {
       window.clearInterval(interval);
       window.clearTimeout(timeout);
       ringtoneStopRef.current?.();
     };
-  }, [callId, direction, open, remoteConnected, startOutgoingWebRtc, stopMedia, type]);
+  }, [callId, direction, open, startOutgoingWebRtc, stopMedia, type]);
+
 
   useEffect(() => {
     if (!open || !callId) return;
@@ -233,18 +276,25 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
 
   const acceptCall = async () => {
     ringtoneStopRef.current?.();
+    acceptedRef.current = true;
     setCallStatus("Connexion média...");
     try {
-      const stream = await startLocalMedia(type === "video");
-      await createPeer(stream);
       if (callId) await supabase.from("calls").update({ status: "active", answered_at: new Date().toISOString(), ring_state: "answered", callee_presence: "answered", media_ready: true } as any).eq("id", callId);
+      if (pendingOfferRef.current) {
+        const offer = pendingOfferRef.current;
+        pendingOfferRef.current = null;
+        await answerOffer(offer);
+      }
       const { data } = callId ? await supabase.from("call_signals").select("*").eq("call_id", callId).order("created_at", { ascending: true }) : { data: [] };
       for (const signal of data || []) await processSignal(signal);
-    } catch {
+      if (!peerRef.current && pendingOfferRef.current) await answerOffer(pendingOfferRef.current);
+    } catch (error) {
+      console.error("acceptCall", error);
       toast.error("Caméra ou micro indisponible");
       setCallStatus("Injoignable");
     }
   };
+
 
   const markRemoteUnavailable = async () => {
     setCallStatus("Injoignable");
