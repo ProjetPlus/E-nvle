@@ -16,9 +16,13 @@ const showBrowserNotification = (title: string, body: string) => {
 };
 
 export const useRealtimeNotifications = (userId: string | undefined, addNotification: AddNotification) => {
+  const addRef = useRef(addNotification);
+  addRef.current = addNotification;
   useEffect(() => {
     if (!userId) return;
+    const addNotification = (n: Notification) => addRef.current(n);
     const sound = localStorage.getItem("envle-notification-sound") || "default";
+
     const loadNotifications = async () => {
       const { data } = await supabase.from("notifications").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(50);
       (data || []).reverse().forEach((n) => addNotification({ id: n.id, type: (n.type as Notification["type"]) || "system", title: n.title, body: n.body || "", time: n.created_at ? new Date(n.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : timeNow(), read: !!n.is_read, icon: n.icon || "🔔" }));
