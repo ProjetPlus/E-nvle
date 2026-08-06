@@ -97,17 +97,21 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
       const [remoteStream] = event.streams;
       remoteStreamRef.current = remoteStream;
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
+      remoteConnectedRef.current = true;
       setRemoteConnected(true);
       setCallStatus("Appel en cours");
       ringtoneStopRef.current?.();
     };
     peer.onconnectionstatechange = () => {
       if (["connected", "completed"].includes(peer.connectionState)) {
+        remoteConnectedRef.current = true;
         setRemoteConnected(true);
         setCallStatus("Appel en cours");
+        ringtoneStopRef.current?.();
       }
       if (["failed", "disconnected"].includes(peer.connectionState)) setCallStatus("Injoignable");
     };
+
     peerRef.current = peer;
     return peer;
   }, [callId, sendSignal]);
