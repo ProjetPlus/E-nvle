@@ -23,6 +23,8 @@ import CreateBusinessModal from "@/components/envle/CreateBusinessModal";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/use-auth";
 import { useRealtimeNotifications } from "@/hooks/use-realtime-notifications";
+import { useIncomingCalls } from "@/hooks/use-incoming-calls";
+
 import { supabase } from "@/integrations/supabase/client";
 import { playLoopingSound } from "@/lib/sounds";
 
