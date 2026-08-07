@@ -375,7 +375,7 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
 
           <AnimatePresence>
             {showParticipants && (
-              <motion.div initial={{ opacity: 0, x: 200 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 200 }} className="absolute right-0 top-0 bottom-0 w-[260px] bg-envle-noir/85 backdrop-blur-md border-l border-primary/20 z-20 p-4">
+              <motion.div initial={{ opacity: 0, x: 200 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 200 }} className="absolute right-0 top-0 bottom-0 w-72 max-w-[80vw] bg-envle-noir/85 backdrop-blur-md border-l border-primary/20 z-20 p-4">
                 <h3 className="text-primary-foreground font-bold mb-4 text-sm">Participants</h3>
                 {participants.map((p) => (
                   <div key={p.name} className="flex items-center gap-3 py-2">
@@ -389,7 +389,7 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
             )}
           </AnimatePresence>
 
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="absolute bottom-8 left-0 right-0 flex justify-center gap-3 md:gap-4 z-10 px-4">
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] md:bottom-8 left-0 right-0 flex flex-wrap justify-center gap-2 md:gap-4 z-10 px-3">
             {direction === "incoming" && callStatus === "Appel entrant" && <button className="w-16 h-16 rounded-full border-none text-2xl cursor-pointer flex items-center justify-center bg-primary text-primary-foreground shadow-lg" onClick={acceptCall} title="Décrocher">📞</button>}
             {[
               { icon: micOn ? "🎙️" : "🔇", onClick: toggleMic, title: "Microphone", danger: !micOn },
@@ -399,9 +399,9 @@ const CallModal = ({ open, type, convName, convAvatar, convAvatarStyle, callId, 
               { icon: "👥", onClick: () => setShowParticipants(!showParticipants), title: "Participants" },
               ...(direction === "outgoing" && callStatus === "Ça sonne..." ? [{ icon: "📵", onClick: markRemoteUnavailable, title: "Marquer injoignable", danger: true }] : []),
             ].map((btn) => (
-              <button key={btn.title} className={`w-14 h-14 rounded-full border-none text-xl cursor-pointer flex items-center justify-center transition-all ${(btn as any).danger ? "bg-envle-rouge text-primary-foreground" : (btn as any).primary ? "bg-primary text-primary-foreground" : "bg-foreground/15 text-primary-foreground"}`} onClick={btn.onClick} title={btn.title}>{btn.icon}</button>
+              <button key={btn.title} className={`w-12 h-12 md:w-14 md:h-14 shrink-0 rounded-full border-none text-lg md:text-xl cursor-pointer flex items-center justify-center transition-all ${(btn as any).danger ? "bg-envle-rouge text-primary-foreground" : (btn as any).primary ? "bg-primary text-primary-foreground" : "bg-foreground/15 text-primary-foreground"}`} onClick={btn.onClick} title={btn.title}>{btn.icon}</button>
             ))}
-            <button className="w-16 h-16 rounded-full border-none text-2xl cursor-pointer flex items-center justify-center bg-envle-rouge text-primary-foreground shadow-lg" onClick={() => handleClose()} title="Raccrocher">📵</button>
+            <button className="w-14 h-14 md:w-16 md:h-16 shrink-0 rounded-full border-none text-xl md:text-2xl cursor-pointer flex items-center justify-center bg-envle-rouge text-primary-foreground shadow-lg" onClick={() => handleClose()} title="Raccrocher">📵</button>
           </motion.div>
         </motion.div>
       )}

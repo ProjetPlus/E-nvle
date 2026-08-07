@@ -123,12 +123,16 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
       .subscribe();
     const refreshOnVisible = () => { if (document.visibilityState === "visible") void fetchMessages(); };
     document.addEventListener("visibilitychange", refreshOnVisible);
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      document.removeEventListener("visibilitychange", refreshOnVisible);
+      supabase.removeChannel(channel);
+    };
   }, [conv.id, user]);
 
   const uploadFileToStorage = useCallback(async (file: File) => {
     const ext = file.name.split(".").pop() || "bin";
-    const path = `${user!.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    if (!user) return null;
+    const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const bucket = "chat-files";
     const { error } = await supabase.storage.from(bucket).upload(path, file, { cacheControl: "3600", upsert: false });
     if (error) { toast.error(`❌ Erreur upload: ${error.message}`); return null; }
@@ -477,7 +481,7 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
       </AnimatePresence>
 
       {/* Input */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="px-2 md:px-5 py-2 pb-3 bg-envle-card border-t border-envle-border flex items-end gap-1.5 md:gap-2 z-10">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="px-3 md:px-5 py-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-envle-card border-t border-envle-border flex items-end gap-1.5 md:gap-2 z-10">
         {isRecording ? (
           <div className="flex-1 flex items-center gap-3 bg-envle-rouge/10 border border-envle-rouge/30 rounded-[22px] px-4 py-3">
             <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity }} className="text-envle-rouge text-sm">🔴</motion.span>

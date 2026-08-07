@@ -65,12 +65,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  const registerCurrentDevice = useCallback((uid?: string) => {
+  const registerCurrentDevice = useCallback(async (uid?: string) => {
     if (!uid) return;
     const now = new Date().toISOString();
     const deviceId = getDeviceId();
-    void supabase.from("user_devices").update({ is_current: false }).eq("user_id", uid);
-    void supabase.from("user_devices").upsert({
+    await supabase.from("user_devices").upsert({
       id: deviceId,
       user_id: uid,
       device_name: getDeviceLabel(),
@@ -89,7 +88,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const activeUser = session?.user ?? null;
       setSession(session);
       setUser(activeUser);
-      registerCurrentDevice(activeUser?.id);
       await loadProfile(activeUser?.id);
       if (mounted) setLoading(false);
       if (session) void supabase.auth.getUser();
@@ -102,17 +100,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
         const activeUser = session?.user ?? null;
         setUser(activeUser);
-        registerCurrentDevice(activeUser?.id);
         setLoading(true);
-        setTimeout(() => void loadProfile(activeUser?.id).finally(() => setLoading(false)), 0);
+        window.setTimeout(() => {
+          if (mounted) void loadProfile(activeUser?.id).finally(() => { if (mounted) setLoading(false); });
+        }, 0);
       }
     );
 
     return () => { mounted = false; subscription.unsubscribe(); };
-  }, [loadProfile, registerCurrentDevice]);
+  }, [loadProfile]);
 
   useEffect(() => {
     if (!user?.id) return;
+    void registerCurrentDevice(user.id);
     const setOnline = () => {
       const now = new Date().toISOString();
       void supabase.from("profiles").update({ status: document.hidden ? "away" : "online", last_seen: now }).eq("id", user.id);
@@ -132,7 +132,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       window.removeEventListener("beforeunload", setOffline);
       void setOffline();
     };
-  }, [user?.id]);
+  }, [registerCurrentDevice, user?.id]);
 
   const signOut = useCallback(async () => {
     if (user?.id) await supabase.from("profiles").update({ status: "offline", last_seen: new Date().toISOString() }).eq("id", user.id);
