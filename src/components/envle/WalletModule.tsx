@@ -59,7 +59,7 @@ const WalletModule = ({ onBack }: { onBack: () => void }) => {
     setLoading(true);
     const [{ data }, { data: walletBalance }] = await Promise.all([
       supabase.from("wallet_transactions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
-      supabase.rpc("wallet_balance", { p_user: user.id, p_currency: selectedCurrency }),
+      supabase.rpc("my_wallet_balance", { p_currency: selectedCurrency }),
     ]);
     setBalance(Number(walletBalance || 0));
     if (data) {
