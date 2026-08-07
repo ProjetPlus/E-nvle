@@ -55,7 +55,15 @@ export const useRealtimeNotifications = (userId: string | undefined, addNotifica
       })
       .subscribe();
 
+    const refreshOnVisible = () => {
+      if (document.visibilityState === "visible") void loadNotifications();
+    };
+    const fallbackPoll = window.setInterval(() => void loadNotifications(), 15_000);
+    document.addEventListener("visibilitychange", refreshOnVisible);
+
     return () => {
+      window.clearInterval(fallbackPoll);
+      document.removeEventListener("visibilitychange", refreshOnVisible);
       supabase.removeChannel(channel);
     };
   }, [userId]);

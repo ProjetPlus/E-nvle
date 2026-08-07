@@ -123,10 +123,10 @@ const AuthModal = ({ open, onClose, locked = false }: Props) => {
   return (
     <AnimatePresence>
       {open && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3" onClick={(e) => e.target === e.currentTarget && !locked && onClose()}>
-          <motion.div initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.92, y: 20 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} className="bg-envle-card border border-envle-border rounded-3xl p-6 md:p-8 w-[480px] max-w-[95vw]">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && !locked && onClose()}>
+          <motion.div initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.92, y: 20 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} className="bg-envle-card border border-envle-border rounded-3xl p-5 md:p-8 w-[480px] max-w-[95vw] max-h-[calc(100dvh-1.5rem)] overflow-y-auto my-auto">
             <div className="flex flex-col items-center mb-5">
-              <motion.img src={envleLogo} alt="E'nvlé" className="w-48 h-48 md:w-56 md:h-56 object-contain drop-shadow-2xl" initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.1, type: "spring" }} />
+              <motion.img src={envleLogo} alt="E'nvlé" className="w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 object-contain drop-shadow-2xl" initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.1, type: "spring" }} />
             </div>
 
             {pairingOpen && (
@@ -160,8 +160,8 @@ const AuthModal = ({ open, onClose, locked = false }: Props) => {
                 <motion.div key="otp" initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -15 }}>
                   <p className="text-sm text-envle-text-muted text-center mb-4">Code envoyé à <span className="text-foreground font-semibold">{fullPhone}</span></p>
                   {generatedCode && <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mb-4 p-4 rounded-2xl border-2 border-dashed border-envle-or/50 bg-envle-or/10 text-center"><p className="text-xs text-envle-text-muted mb-1">🔑 Code OTP simulé</p><p className="text-3xl font-bold font-mono tracking-[8px] text-envle-or">{generatedCode}</p><p className="text-[10px] text-envle-text-muted mt-1">Valable 5 minutes</p></motion.div>}
-                  <div className="flex gap-2 justify-center mb-4">
-                    {otpCode.map((digit, i) => <input key={i} ref={(el) => { inputRefs.current[i] = el; }} type="text" inputMode="numeric" maxLength={1} value={digit} onChange={(e) => handleOtpInput(i, e.target.value)} onKeyDown={(e) => handleOtpKeyDown(i, e)} className="w-11 md:w-12 h-14 text-center text-2xl font-bold bg-foreground/[0.06] border border-envle-border rounded-xl text-foreground outline-none focus:border-primary focus:shadow-[0_0_0_3px_hsla(142,47%,33%,0.15)] transition-all" />)}
+                  <div className="grid grid-cols-6 gap-1.5 sm:gap-2 mb-4">
+                    {otpCode.map((digit, i) => <input key={i} ref={(el) => { inputRefs.current[i] = el; }} type="text" inputMode="numeric" maxLength={1} value={digit} onChange={(e) => handleOtpInput(i, e.target.value)} onKeyDown={(e) => handleOtpKeyDown(i, e)} className="w-full min-w-0 h-12 sm:h-14 text-center text-xl sm:text-2xl font-bold bg-foreground/[0.06] border border-envle-border rounded-xl text-foreground outline-none focus:border-primary focus:shadow-[0_0_0_3px_hsla(142,47%,33%,0.15)] transition-all" />)}
                   </div>
                   {countdown > 0 && <p className="text-center text-xs text-envle-text-muted mb-3">⏱️ Expire dans <span className="text-envle-or font-bold">{formatCountdown(countdown)}</span></p>}
                   <motion.button whileTap={{ scale: 0.97 }} whileHover={{ y: -2 }} disabled={loading} className="w-full py-3.5 rounded-[14px] border-none text-primary-foreground font-body text-[15px] font-bold cursor-pointer transition-all shadow-[0_4px_20px_hsla(142,47%,33%,0.4)] disabled:opacity-50 bg-primary" onClick={() => verifyOTP()}>{loading ? "⏳ Connexion..." : "Entrer"}</motion.button>
