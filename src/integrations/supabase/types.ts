@@ -1148,6 +1148,7 @@ export type Database = {
         Args: { _conv: string; _user: string }
         Returns: boolean
       }
+      my_wallet_balance: { Args: { p_currency?: string }; Returns: number }
       transfer_wallet: {
         Args: {
           p_amount: number
