@@ -59,7 +59,7 @@ const WalletModule = ({ onBack }: { onBack: () => void }) => {
     setLoading(true);
     const [{ data }, { data: walletBalance }] = await Promise.all([
       supabase.from("wallet_transactions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50),
-      supabase.rpc("wallet_balance", { p_user: user.id, p_currency: selectedCurrency }),
+      supabase.rpc("my_wallet_balance", { p_currency: selectedCurrency }),
     ]);
     setBalance(Number(walletBalance || 0));
     if (data) {
@@ -122,7 +122,7 @@ const WalletModule = ({ onBack }: { onBack: () => void }) => {
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mx-4 md:mx-6 mt-3 overflow-hidden">
               <div className="bg-envle-card border border-envle-border rounded-2xl p-3 max-h-[200px] overflow-y-auto scrollbar-thin">
                 <p className="text-xs font-bold text-envle-text-muted mb-2">Devises</p>
-                <div className="grid grid-cols-2 gap-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
                   {CURRENCIES.map(c => (
                     <motion.button
                       key={c.code}

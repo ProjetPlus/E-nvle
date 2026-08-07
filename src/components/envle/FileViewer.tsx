@@ -68,7 +68,7 @@ const FileViewer = ({ file, onClose }: Props) => {
             <div className="bg-white/10 rounded-3xl p-8 flex flex-col items-center gap-4">
               <span className="text-6xl">🎵</span>
               <div className="text-white text-sm font-semibold">{file.name}</div>
-              <audio src={fileUrl} controls className="w-[300px]" />
+              <audio src={fileUrl} controls className="w-full max-w-[300px]" />
             </div>
           )}
           {isPDF && (

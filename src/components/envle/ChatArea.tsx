@@ -23,6 +23,7 @@ interface Message {
   fileSize?: number;
   messageType?: string;
   senderLang?: string;
+  pending?: boolean;
 }
 
 interface Props {
@@ -79,8 +80,8 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
   useEffect(() => {
     if (!conv.id || !user) { setMessages([]); return; }
     const fetchMessages = async () => {
-      await supabase.rpc("cleanup_ephemeral_messages");
-      const { data } = await supabase.from("messages").select("*").eq("conversation_id", conv.id).is("deleted_at", null).or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).order("created_at", { ascending: true }).limit(100);
+      const { data, error } = await supabase.from("messages").select("*").eq("conversation_id", conv.id).is("deleted_at", null).or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).order("created_at", { ascending: true }).limit(100);
+      if (error) { toast.error(`Messages indisponibles: ${error.message}`); return; }
       if (data) {
         setMessages(data.map((m) => ({
           id: m.id, text: m.content || "", sent: m.sender_id === user.id,
@@ -111,13 +112,27 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
         });
         if (m.sender_id !== user.id) supabase.from("messages").update({ is_read: true }).eq("id", m.id).then(() => {});
       })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_id=eq.${conv.id}` }, (payload) => {
+        const updated = payload.new as any;
+        setMessages((prev) => updated.deleted_at ? prev.filter((message) => message.id !== updated.id) : prev.map((message) => message.id === updated.id ? { ...message, text: updated.content || "", pending: false } : message));
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "messages", filter: `conversation_id=eq.${conv.id}` }, (payload) => {
+        const removed = payload.old as { id?: string };
+        if (removed.id) setMessages((prev) => prev.filter((message) => message.id !== removed.id));
+      })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const refreshOnVisible = () => { if (document.visibilityState === "visible") void fetchMessages(); };
+    document.addEventListener("visibilitychange", refreshOnVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshOnVisible);
+      supabase.removeChannel(channel);
+    };
   }, [conv.id, user]);
 
   const uploadFileToStorage = useCallback(async (file: File) => {
     const ext = file.name.split(".").pop() || "bin";
-    const path = `${user!.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    if (!user) return null;
+    const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const bucket = "chat-files";
     const { error } = await supabase.storage.from(bucket).upload(path, file, { cacheControl: "3600", upsert: false });
     if (error) { toast.error(`❌ Erreur upload: ${error.message}`); return null; }
@@ -152,8 +167,14 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
       }
       if (text) {
         const expiresAt = ephemeralTtl > 0 ? new Date(Date.now() + ephemeralTtl * 1000).toISOString() : null;
-        const { error } = await supabase.from("messages").insert({ conversation_id: conv.id, sender_id: user.id, content: text, message_type: "text", expires_at: expiresAt });
-        if (error) throw error;
+        const optimisticId = `pending-${crypto.randomUUID()}`;
+        setMessages((prev) => [...prev, { id: optimisticId, text, sent: true, time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }), messageType: "text", pending: true }]);
+        const { data: inserted, error } = await supabase.from("messages").insert({ conversation_id: conv.id, sender_id: user.id, content: text, message_type: "text", expires_at: expiresAt }).select().single();
+        if (error) {
+          setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
+          throw error;
+        }
+        setMessages((prev) => prev.map((message) => message.id === optimisticId ? { ...message, id: inserted.id, time: inserted.created_at ? new Date(inserted.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : message.time, pending: false } : message));
       }
       await supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conv.id);
     } catch (error) { toast.error(error instanceof Error ? error.message : "❌ Erreur d'envoi"); } finally { setSending(false); }
@@ -304,13 +325,13 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
   };
 
   return (
-    <main className="flex-1 flex flex-col overflow-hidden bg-background relative">
+    <main className="flex-1 min-w-0 w-full flex flex-col overflow-hidden bg-background relative">
       <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "radial-gradient(circle at 20% 20%, hsla(142,47%,33%,0.04) 0%, transparent 50%), radial-gradient(circle at 80% 80%, hsla(37,90%,58%,0.03) 0%, transparent 50%)" }} />
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="px-3 md:px-6 py-3 bg-envle-card border-b border-envle-border flex items-center gap-2 md:gap-3 z-10">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="px-2 md:px-6 py-2.5 md:py-3 bg-envle-card border-b border-envle-border flex items-center gap-1.5 md:gap-3 z-10 min-w-0">
         {onBack && <motion.button whileTap={{ scale: 0.85 }} className="w-9 h-9 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all" onClick={onBack}>←</motion.button>}
-        <motion.div whileHover={{ scale: 1.05 }} className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-base" style={{ background: conv.avatarStyle }}>{conv.avatar || "💬"}</motion.div>
+        <motion.div whileHover={{ scale: 1.05 }} className="hidden sm:flex w-10 h-10 shrink-0 rounded-full items-center justify-center font-bold text-base" style={{ background: conv.avatarStyle }}>{conv.avatar || "💬"}</motion.div>
         <div className="flex-1 min-w-0">
           {conv.id ? (
             <>
@@ -320,7 +341,7 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
           ) : <div className="text-sm font-bold truncate text-envle-text-muted">Messages</div>}
         </div>
         {conv.id && (
-        <div className="flex gap-1 relative">
+        <div className="flex gap-1 relative overflow-x-auto max-w-[58vw] sm:max-w-none shrink-0" style={{ scrollbarWidth: "none" }}>
           {[
             { icon: "✨", action: onOpenStories, title: "Stories" },
             { icon: "📞", action: () => onOpenCall("audio"), title: "Appel audio" },
@@ -333,7 +354,7 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
               key={item.title}
               whileTap={{ scale: 0.85 }}
               whileHover={{ scale: 1.1 }}
-              className={`w-8 h-8 md:w-9 md:h-9 rounded-xl border-none text-base cursor-pointer transition-all flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light ${item.title === "Messages éphémères" && ephemeralTtl > 0 ? "bg-primary/20 text-envle-vert-light" : "bg-foreground/[0.06] text-envle-text-muted"}`}
+              className={`w-8 h-8 md:w-9 md:h-9 shrink-0 rounded-xl border-none text-base cursor-pointer transition-all flex items-center justify-center hover:bg-primary/20 hover:text-envle-vert-light ${item.title === "Messages éphémères" && ephemeralTtl > 0 ? "bg-primary/20 text-envle-vert-light" : "bg-foreground/[0.06] text-envle-text-muted"}`}
               onClick={item.action}
               title={item.title}
             >
@@ -420,7 +441,7 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
                 <div className="text-[10px] opacity-60 mt-1 flex items-center justify-end gap-1">
                   {ephemeralTtl > 0 && msg.sent && <span>⏳</span>}
                   {msg.time}
-                  {msg.sent && <span className="text-xs text-envle-or">✓✓</span>}
+                  {msg.sent && <span className="text-xs text-envle-or">{msg.pending ? "◷" : "✓✓"}</span>}
                 </div>
               </motion.div>
             </motion.div>
@@ -460,7 +481,7 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
       </AnimatePresence>
 
       {/* Input */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="px-2 md:px-5 py-2 pb-3 bg-envle-card border-t border-envle-border flex items-end gap-1.5 md:gap-2 z-10">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="px-3 md:px-5 py-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-envle-card border-t border-envle-border flex items-end gap-1.5 md:gap-2 z-10">
         {isRecording ? (
           <div className="flex-1 flex items-center gap-3 bg-envle-rouge/10 border border-envle-rouge/30 rounded-[22px] px-4 py-3">
             <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity }} className="text-envle-rouge text-sm">🔴</motion.span>
@@ -471,13 +492,13 @@ const ChatArea = ({ conv, onOpenCall, onOpenStories, onOpenNotifications, onBack
         ) : (
           <motion.div
             animate={{ borderColor: inputFocused ? "hsla(142, 47%, 33%, 0.5)" : "hsla(218, 20%, 17%, 1)" }}
-            className="flex-1 bg-foreground/[0.06] border border-envle-border rounded-[22px] px-3 py-2 flex items-end gap-1.5 transition-shadow"
+            className="flex-1 min-w-0 bg-foreground/[0.06] border border-envle-border rounded-[22px] px-2.5 md:px-3 py-2 flex items-end gap-1.5 transition-shadow"
             style={inputFocused ? { boxShadow: "0 0 0 3px hsla(142,47%,33%,0.15)" } : {}}
           >
             <motion.span whileTap={{ scale: 0.8 }} className="text-lg cursor-pointer opacity-60 hover:opacity-100 text-envle-text-muted hover:text-envle-vert-light transition-opacity pb-0.5" onClick={() => setShowEmojis(!showEmojis)}>😀</motion.span>
             <textarea
               ref={textareaRef}
-              className="flex-1 bg-transparent border-none outline-none text-foreground font-body text-sm resize-none max-h-[120px] placeholder:text-envle-text-muted"
+              className="flex-1 min-w-0 bg-transparent border-none outline-none text-foreground font-body text-sm resize-none max-h-[120px] placeholder:text-envle-text-muted"
               placeholder="Écrire un message..."
               rows={1}
               value={input}

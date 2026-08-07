@@ -218,7 +218,7 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
   });
 
   return (
-    <div className="w-[340px] bg-envle-card border-r border-envle-border flex flex-col overflow-hidden max-lg:w-[280px] max-md:w-full max-md:border-r-0">
+    <div className="w-[340px] min-w-0 bg-envle-card border-r border-envle-border flex flex-col overflow-hidden max-lg:w-[280px] max-md:w-full max-md:border-r-0">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="px-4 md:px-5 pt-4 md:pt-5 flex items-center gap-2">
         <div className="flex-1">
           <h2 className="font-display text-xl md:text-[26px] font-bold">Messages</h2>
@@ -302,7 +302,7 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
               variants={staggerItem}
               whileTap={{ scale: 0.97 }}
               whileHover={{ x: 4, backgroundColor: "hsla(142, 47%, 33%, 0.04)" }}
-              className={`group flex items-center gap-3 p-2.5 md:p-3 rounded-[14px] cursor-pointer transition-colors ${
+                className={`group flex items-center gap-2 md:gap-3 p-2.5 md:p-3 rounded-[14px] cursor-pointer transition-colors ${
                 activeConvId === conv.id ? "bg-primary/[0.12]" : ""
               }`}
               onClick={() => onSelectConv(conv)}
@@ -333,7 +333,7 @@ const ConversationPanel = ({ activeConvId, onSelectConv }: Props) => {
                 )}
               </div>
               <button
-                className="w-7 h-7 shrink-0 rounded-lg border-none bg-transparent text-envle-text-muted cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                className="w-7 h-7 shrink-0 rounded-lg border-none bg-transparent text-envle-text-muted cursor-pointer opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 transition-opacity"
                 title="Options"
                 onClick={(e) => { e.stopPropagation(); setMenuConv(conv); }}
               >

@@ -159,8 +159,8 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
   ];
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-background">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3">
+    <div className="relative flex-1 min-w-0 flex flex-col overflow-hidden bg-background">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="px-4 md:px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3">
         <motion.button whileTap={{ scale: 0.85 }} className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center hover:bg-primary/20 transition-all md:hidden" onClick={onBack}>←</motion.button>
         <h2 className="font-display text-2xl font-bold flex-1">Paramètres</h2>
       </motion.div>
@@ -173,7 +173,7 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
           transition={{ delay: 0.1, type: "spring" }}
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
-          className="mx-6 mt-6 bg-envle-card border border-envle-border rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:border-primary/30 transition-all"
+          className="mx-4 md:mx-6 mt-4 md:mt-6 bg-envle-card border border-envle-border rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:border-primary/30 transition-all"
           onClick={() => setActiveSection("profile")}
         >
           <motion.div whileHover={{ scale: 1.08, rotate: 3 }} className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold border-2 border-primary overflow-hidden" style={{ background: profile.avatarStyle }}>{profile.avatarUrl ? <img src={profile.avatarUrl} alt="Profil" className="w-full h-full object-cover" /> : profile.avatar}</motion.div>
@@ -185,7 +185,7 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
         </motion.div>
 
         {/* Sections */}
-        <div className="px-6 py-4 flex flex-col gap-0.5">
+        <div className="px-4 md:px-6 py-4 flex flex-col gap-0.5">
           {sections.map((section, i) => (
             <motion.div
               key={section.id}
@@ -212,7 +212,7 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
         </div>
 
         {/* Logout */}
-        <div className="px-6 pb-8">
+        <div className="px-4 md:px-6 pb-8">
           <motion.button whileTap={{ scale: 0.97 }} whileHover={{ scale: 1.01 }} className="w-full py-3 rounded-xl border border-envle-rouge/30 bg-envle-rouge/10 text-envle-rouge text-sm font-semibold cursor-pointer font-body hover:bg-envle-rouge/20 transition-all" onClick={() => signOut()}>
             🚪 Se déconnecter
           </motion.button>
@@ -223,12 +223,12 @@ const SettingsModule = ({ onBack, userProfile, onUpdateProfile, requireProfile =
       <AnimatePresence>
         {activeSection === "profile" && (
           <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 30 }} transition={{ type: "spring", damping: 25 }} className="absolute inset-0 z-50 bg-background flex flex-col">
-            <div className="px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3">
+            <div className="px-4 md:px-6 py-4 bg-envle-card border-b border-envle-border flex items-center gap-3">
               {!requireProfile && <motion.button whileTap={{ scale: 0.85 }} className="w-10 h-10 rounded-xl bg-foreground/[0.06] border-none text-lg cursor-pointer flex items-center justify-center" onClick={() => setActiveSection(null)}>←</motion.button>}
               <h3 className="font-display text-xl font-bold flex-1">Mon profil</h3>
               <motion.button whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }} className="px-4 py-2 rounded-xl border-none text-sm font-semibold cursor-pointer text-primary-foreground" style={{ background: "linear-gradient(135deg, hsl(var(--envle-vert)), hsl(var(--envle-vert-dark)))" }} onClick={saveProfile}>Sauvegarder</motion.button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 scrollbar-thin">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col gap-4 scrollbar-thin">
               {requireProfile && <div className="rounded-2xl border border-envle-or/30 bg-envle-or/10 p-3 text-sm text-envle-or">Complétez votre profil pour accéder à E'nvlé One.</div>}
               <label className="relative min-h-40 rounded-2xl border border-envle-border overflow-hidden cursor-pointer bg-foreground/[0.06] flex items-center justify-center group">
                 {profile.coverUrl ? <img src={profile.coverUrl} alt="Photo de couverture" className="absolute inset-0 w-full h-full object-cover" /> : <span className="text-xs text-envle-text-muted">Photo de couverture</span>}

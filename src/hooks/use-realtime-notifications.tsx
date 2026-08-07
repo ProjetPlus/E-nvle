@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { playNotificationSound } from "@/lib/sounds";
 import type { Notification } from "@/components/envle/NotificationCenter";
@@ -45,17 +44,17 @@ export const useRealtimeNotifications = (userId: string | undefined, addNotifica
         playNotificationSound(sound);
         showBrowserNotification(notification.title, notification.body);
       })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "calls", filter: `callee_id=eq.${userId}` }, (payload) => {
-        const call = payload.new as { id: string; call_type?: string; status?: string };
-        const body = call.call_type === "video" ? "Appel vidéo entrant" : "Appel audio entrant";
-        addNotification({ id: `call-${call.id}`, type: "call", title: "Appel entrant", body, time: timeNow(), read: false, icon: "📞" });
-        playNotificationSound(localStorage.getItem("envle-ringtone") || "incoming");
-        showBrowserNotification("Appel entrant", body);
-        toast.info(`📞 ${body}`);
-      })
       .subscribe();
 
+    const refreshOnVisible = () => {
+      if (document.visibilityState === "visible") void loadNotifications();
+    };
+    const fallbackPoll = window.setInterval(() => void loadNotifications(), 15_000);
+    document.addEventListener("visibilitychange", refreshOnVisible);
+
     return () => {
+      window.clearInterval(fallbackPoll);
+      document.removeEventListener("visibilitychange", refreshOnVisible);
       supabase.removeChannel(channel);
     };
   }, [userId]);

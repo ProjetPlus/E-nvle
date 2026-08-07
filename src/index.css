@@ -130,6 +130,12 @@
     font-family: var(--font-body);
     overflow: hidden;
   }
+  html, body, #root {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    overscroll-behavior: none;
+  }
 }
 
 /* Custom scrollbar */

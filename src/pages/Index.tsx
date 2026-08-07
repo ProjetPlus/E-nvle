@@ -85,7 +85,10 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
   const [createModal, setCreateModal] = useState<{ open: boolean; type: "business" | "job" | "product" }>({ open: false, type: "business" });
   const isMobile = useIsMobile();
   const { user, profile, loading: authLoading } = useAuth();
-  useRealtimeNotifications(user?.id, (notification) => setNotifications((prev) => [notification, ...prev].slice(0, 80)));
+  useRealtimeNotifications(user?.id, (notification) => setNotifications((prev) => {
+    const withoutExisting = prev.filter((item) => item.id !== notification.id);
+    return [notification, ...withoutExisting].slice(0, 80);
+  }));
 
   const userInitials = profile?.full_name ? profile.full_name.substring(0, 2).toUpperCase() : user?.email ? user.email.substring(0, 2).toUpperCase() : "?";
   const mustCompleteProfile = Boolean(user && profile?.profile_completed !== true);
@@ -176,8 +179,18 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
     setMobileView("list");
   }, []);
 
-  const markAllRead = () => setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  const clearNotifications = () => setNotifications([]);
+  const markAllRead = async () => {
+    if (!user) return;
+    const { error } = await supabase.from("notifications").update({ is_read: true }).eq("user_id", user.id).eq("is_read", false);
+    if (error) { toast.error(error.message); return; }
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+  const clearNotifications = async () => {
+    if (!user) return;
+    const { error } = await supabase.from("notifications").delete().eq("user_id", user.id);
+    if (error) { toast.error(error.message); return; }
+    setNotifications([]);
+  };
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const renderMainContent = () => {
@@ -187,7 +200,7 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
 
     return (
       <AnimatePresence mode="wait">
-        <motion.div key={activeNav} {...pageTransition} className="flex-1 flex overflow-hidden">
+        <motion.div key={activeNav} {...pageTransition} className="flex-1 min-w-0 w-full flex overflow-hidden">
           {activeNav === "stories" && <StoriesModule onBack={goChat} />}
           {activeNav === "shop" && <BoutiqueModule onBack={goChat} onCreateProduct={() => setCreateModal({ open: true, type: "product" })} />}
           {activeNav === "community" && <CommunityModule onBack={goChat} />}
@@ -198,10 +211,10 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
           {activeNav === "settings" && <SettingsModule onBack={goChat} userProfile={userProfile} onUpdateProfile={setUserProfile} requireProfile={mustCompleteProfile || forceProfile} onProfileSaved={() => setActiveNav("chat")} />}
           {activeNav === "chat" && (
             <>
-              <div className={`${isMobile && mobileView === "chat" ? "hidden" : "flex"} ${isMobile ? "flex-1" : ""}`}>
+              <div className={`min-w-0 ${isMobile && mobileView === "chat" ? "hidden" : "flex"} ${isMobile ? "flex-1" : ""}`}>
                 <ConversationPanel activeConvId={activeConv.id} onSelectConv={handleSelectConv} />
               </div>
-              <div className={`flex-1 flex ${isMobile && mobileView === "list" ? "hidden" : ""}`}>
+              <div className={`flex-1 min-w-0 flex ${isMobile && mobileView === "list" ? "hidden" : ""}`}>
                 <ChatArea conv={activeConv} onOpenCall={openCall} onOpenStories={() => setActiveNav("stories")} onOpenNotifications={() => setNotificationsOpen(true)} onBack={isMobile ? () => setMobileView("list") : undefined} />
               </div>
               {!isMobile && <RightPanel conv={activeConv} onOpenCall={openCall} onNavigate={setActiveNav} />}
@@ -213,10 +226,10 @@ const Index = ({ initialNav = "chat", forceProfile = false, authOnly = false }: 
   };
 
   return (
-    <div className="h-screen overflow-hidden">
+    <div className="h-dvh min-h-0 w-full overflow-hidden">
       {!authOnly && showSplash && <SplashScreen onFinish={handleSplashFinish} />}
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: authOnly || appVisible ? 1 : 0 }} transition={{ duration: 0.5 }} className="flex h-screen">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: authOnly || appVisible ? 1 : 0 }} transition={{ duration: 0.5 }} className="flex h-dvh min-h-0 w-full overflow-hidden">
         {user && !forceProfile && !mustCompleteProfile && <Sidebar
           activeNav={activeNav}
           onNavChange={handleNavChange}
